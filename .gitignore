@@ -1,0 +1,27 @@
+# STM32 / CMake build outputs
+build/
+cmake-build-*/
+Debug/
+Release/
+
+# Object and binary artifacts
+*.o
+*.obj
+*.d
+*.a
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+# CubeMX temporary files
+mx.scratch
+
+# Local editor / OS noise
+.DS_Store
+*.swp
+*~
+
+# Keep project settings tracked
+!.settings/
