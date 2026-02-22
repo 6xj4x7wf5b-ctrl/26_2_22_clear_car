@@ -25,16 +25,39 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include <string.h>
+
+#include "queue.h"
+#include "semphr.h"
+#include "tim.h"
+#include "usbd_cdc_if.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef struct
+{
+  char text[128];
+} app_cmd_msg_t;
+
+typedef struct
+{
+  char text[128];
+} app_reply_msg_t;
+
+typedef struct
+{
+  char text[128];
+} app_error_msg_t;
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define APP_CDC_FRAME_BUF_SIZE      256U
+#define APP_SENSOR_PERIOD_MS        1000U
 
 /* USER CODE END PD */
 
@@ -45,6 +68,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+static QueueHandle_t cmdQueue;
+static QueueHandle_t replyQueue;
+static QueueHandle_t errorQueue;
+static SemaphoreHandle_t cdcFrameSem;
 
 /* USER CODE END Variables */
 /* Definitions for uartRxTask */
@@ -85,6 +112,9 @@ const osThreadAttr_t errorTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
+static void app_cdc_send_text(const char *text);
+static void app_push_error(const char *text);
+void app_on_cdc_frame_timeout_isr(void);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -120,7 +150,10 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+  cmdQueue = xQueueCreate(8U, sizeof(app_cmd_msg_t));
+  replyQueue = xQueueCreate(8U, sizeof(app_reply_msg_t));
+  errorQueue = xQueueCreate(4U, sizeof(app_error_msg_t));
+  cdcFrameSem = xSemaphoreCreateBinary();
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -161,10 +194,32 @@ void appUartRxTask(void *argument)
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN appUartRxTask */
+  uint8_t frameBuf[APP_CDC_FRAME_BUF_SIZE];
+  app_cmd_msg_t cmdMsg;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    if (xSemaphoreTake(cdcFrameSem, portMAX_DELAY) == pdTRUE)
+    {
+      uint32_t readLen = CDC_Read_FS(frameBuf, APP_CDC_FRAME_BUF_SIZE - 1U);
+      if (readLen > 0U)
+      {
+        frameBuf[readLen] = '\0';
+        memset(&cmdMsg, 0, sizeof(cmdMsg));
+        snprintf(cmdMsg.text, sizeof(cmdMsg.text), "%s", (char *)frameBuf);
+        if (xQueueSend(cmdQueue, &cmdMsg, 0U) != pdPASS)
+        {
+          app_push_error("cmd queue full\n");
+        }
+      }
+
+      if (CDC_RxDroppedFlag_FS() != 0U)
+      {
+        CDC_ClearRxDroppedFlag_FS();
+        app_push_error("cdc rx overflow\n");
+      }
+    }
   }
   /* USER CODE END appUartRxTask */
 }
@@ -179,10 +234,15 @@ void appUartRxTask(void *argument)
 void appUartTxTask(void *argument)
 {
   /* USER CODE BEGIN appUartTxTask */
+  app_reply_msg_t replyMsg;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    if (xQueueReceive(replyQueue, &replyMsg, portMAX_DELAY) == pdTRUE)
+    {
+      app_cdc_send_text(replyMsg.text);
+    }
   }
   /* USER CODE END appUartTxTask */
 }
@@ -197,10 +257,21 @@ void appUartTxTask(void *argument)
 void appCmdHandleTask(void *argument)
 {
   /* USER CODE BEGIN appCmdHandleTask */
+  app_cmd_msg_t cmdMsg;
+  app_reply_msg_t replyMsg;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    if (xQueueReceive(cmdQueue, &cmdMsg, portMAX_DELAY) == pdTRUE)
+    {
+      memset(&replyMsg, 0, sizeof(replyMsg));
+      snprintf(replyMsg.text, sizeof(replyMsg.text), "ACK:%s", cmdMsg.text);
+      if (xQueueSend(replyQueue, &replyMsg, 0U) != pdPASS)
+      {
+        app_push_error("reply queue full\n");
+      }
+    }
   }
   /* USER CODE END appCmdHandleTask */
 }
@@ -215,10 +286,15 @@ void appCmdHandleTask(void *argument)
 void appSensorTask(void *argument)
 {
   /* USER CODE BEGIN appSensorTask */
+  app_cmd_msg_t sensorCmd;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    memset(&sensorCmd, 0, sizeof(sensorCmd));
+    snprintf(sensorCmd.text, sizeof(sensorCmd.text), "sensor:update");
+    (void)xQueueSend(cmdQueue, &sensorCmd, 0U);
+    osDelay(APP_SENSOR_PERIOD_MS);
   }
   /* USER CODE END appSensorTask */
 }
@@ -233,16 +309,69 @@ void appSensorTask(void *argument)
 void appErrorTask(void *argument)
 {
   /* USER CODE BEGIN appErrorTask */
+  app_error_msg_t errMsg;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    if (xQueueReceive(errorQueue, &errMsg, portMAX_DELAY) == pdTRUE)
+    {
+      app_cdc_send_text(errMsg.text);
+    }
   }
   /* USER CODE END appErrorTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
+static void app_cdc_send_text(const char *text)
+{
+  if (text == NULL)
+  {
+    return;
+  }
+
+  uint16_t len = (uint16_t)strlen(text);
+  if (len == 0U)
+  {
+    return;
+  }
+
+  while (CDC_Transmit_FS((uint8_t *)text, len) == USBD_BUSY)
+  {
+    osDelay(1);
+  }
+}
+
+static void app_push_error(const char *text)
+{
+  app_error_msg_t errMsg;
+
+  if (text == NULL)
+  {
+    return;
+  }
+
+  memset(&errMsg, 0, sizeof(errMsg));
+  snprintf(errMsg.text, sizeof(errMsg.text), "%s", text);
+  (void)xQueueSend(errorQueue, &errMsg, 0U);
+}
+
+void app_on_cdc_frame_timeout_isr(void)
+{
+  BaseType_t higherPrioTaskWoken = pdFALSE;
+
+  if (cdcFrameSem != NULL)
+  {
+    (void)xSemaphoreGiveFromISR(cdcFrameSem, &higherPrioTaskWoken);
+  }
+
+  (void)HAL_TIM_Base_Stop_IT(&htim5);
+  __HAL_TIM_SET_COUNTER(&htim5, 0U);
+
+  portYIELD_FROM_ISR(higherPrioTaskWoken);
+}
 
 /* USER CODE END Application */
 

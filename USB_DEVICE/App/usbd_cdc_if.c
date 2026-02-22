@@ -98,7 +98,7 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 /* USER CODE BEGIN PRIVATE_VARIABLES */
 static ring_buffer_t cdc_rx_ring;
 static uint8_t cdc_rx_storage[APP_RX_DATA_SIZE];
-static volatile uint32_t cdc_rx_dropped;
+static volatile uint8_t cdc_rx_dropped_flag;
 
 static void CDC_RxRefreshTimer_FS(void);
 
@@ -160,7 +160,7 @@ static int8_t CDC_Init_FS(void)
 {
   /* USER CODE BEGIN 3 */
   ring_buffer_init(&cdc_rx_ring, cdc_rx_storage, sizeof(cdc_rx_storage));
-  cdc_rx_dropped = 0U;
+  cdc_rx_dropped_flag = 0U;
 
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
@@ -276,7 +276,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   if (written < *Len)
   {
     // Todo: 上报缓冲区溢出消息
-    cdc_rx_dropped += (*Len - written);
+    cdc_rx_dropped_flag = 1U;
   }
 
   CDC_RxRefreshTimer_FS();
@@ -337,6 +337,16 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
 
+uint32_t CDC_Read_FS(uint8_t *Buf, uint32_t Len)
+{
+  return ring_buffer_read(&cdc_rx_ring, Buf, Len);
+}
+
+uint32_t CDC_RxAvailable_FS(void)
+{
+  return ring_buffer_count(&cdc_rx_ring);
+}
+
 static void CDC_RxRefreshTimer_FS(void)
 {
   if ((htim5.Instance->CR1 & TIM_CR1_CEN) == 0U)
@@ -348,9 +358,14 @@ static void CDC_RxRefreshTimer_FS(void)
   __HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE);
 }
 
-uint32_t CDC_RxDropped_FS(void)
+uint8_t CDC_RxDroppedFlag_FS(void)
 {
-  return cdc_rx_dropped;
+  return cdc_rx_dropped_flag;
+}
+
+void CDC_ClearRxDroppedFlag_FS(void)
+{
+  cdc_rx_dropped_flag = 0U;
 }
 
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */

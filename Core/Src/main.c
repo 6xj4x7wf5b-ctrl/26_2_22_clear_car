@@ -59,6 +59,7 @@ char buffer[128];
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
+void app_on_cdc_frame_timeout_isr(void);
 
 /* USER CODE END PFP */
 
@@ -201,6 +202,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
+  if (htim->Instance == TIM5)
+  {
+    app_on_cdc_frame_timeout_isr();
+  }
 
   /* USER CODE END Callback 1 */
 }
