@@ -22,6 +22,8 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
+#include "ring_buffer.h"
+#include "tim.h"
 
 /* USER CODE END INCLUDE */
 
@@ -94,6 +96,11 @@ uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
+static ring_buffer_t cdc_rx_ring;
+static uint8_t cdc_rx_storage[APP_RX_DATA_SIZE];
+static volatile uint32_t cdc_rx_dropped;
+
+static void CDC_RxRefreshTimer_FS(void);
 
 /* USER CODE END PRIVATE_VARIABLES */
 
@@ -152,9 +159,13 @@ USBD_CDC_ItfTypeDef USBD_Interface_fops_FS =
 static int8_t CDC_Init_FS(void)
 {
   /* USER CODE BEGIN 3 */
+  ring_buffer_init(&cdc_rx_ring, cdc_rx_storage, sizeof(cdc_rx_storage));
+  cdc_rx_dropped = 0U;
+
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
   /* USER CODE END 3 */
 }
@@ -261,7 +272,16 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
+  uint32_t written = ring_buffer_write(&cdc_rx_ring, Buf, *Len);
+  if (written < *Len)
+  {
+    // Todo: 上报缓冲区溢出消息
+    cdc_rx_dropped += (*Len - written);
+  }
+
+  CDC_RxRefreshTimer_FS();
+
+  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
   /* USER CODE END 6 */
@@ -316,6 +336,22 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
+
+static void CDC_RxRefreshTimer_FS(void)
+{
+  if ((htim5.Instance->CR1 & TIM_CR1_CEN) == 0U)
+  {
+    (void)HAL_TIM_Base_Start_IT(&htim5);
+  }
+
+  __HAL_TIM_SET_COUNTER(&htim5, 0U);
+  __HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE);
+}
+
+uint32_t CDC_RxDropped_FS(void)
+{
+  return cdc_rx_dropped;
+}
 
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
 
