@@ -75,6 +75,13 @@ const osThreadAttr_t sensorTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for errorTask */
+osThreadId_t errorTaskHandle;
+const osThreadAttr_t errorTask_attributes = {
+  .name = "errorTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityRealtime,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -85,6 +92,7 @@ void appUartRxTask(void *argument);
 void appUartTxTask(void *argument);
 void appCmdHandleTask(void *argument);
 void appSensorTask(void *argument);
+void appErrorTask(void *argument);
 
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -127,6 +135,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of sensorTask */
   sensorTaskHandle = osThreadNew(appSensorTask, NULL, &sensorTask_attributes);
+
+  /* creation of errorTask */
+  errorTaskHandle = osThreadNew(appErrorTask, NULL, &errorTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -210,6 +221,24 @@ void appSensorTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END appSensorTask */
+}
+
+/* USER CODE BEGIN Header_appErrorTask */
+/**
+* @brief Function implementing the errorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_appErrorTask */
+void appErrorTask(void *argument)
+{
+  /* USER CODE BEGIN appErrorTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END appErrorTask */
 }
 
 /* Private application code --------------------------------------------------*/
