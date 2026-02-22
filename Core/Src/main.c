@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "crc.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -104,6 +105,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
   MX_TIM5_Init();
+  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
   CDC_Transmit_FS((uint8_t *)"System Start\n", 13);
 
