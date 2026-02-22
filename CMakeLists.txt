@@ -46,10 +46,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/motor.c
     User/sensor_switch.c
-    User/vcp_comm_rx.c
-    User/vcp_comm_tx.c
     User/cJSON.c
-    User/vcp_comm_exec.c
+    User/ring_buffer.c
 )
 
 # Add include paths
