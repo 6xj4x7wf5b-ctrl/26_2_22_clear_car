@@ -30,7 +30,8 @@
 /* USER CODE BEGIN Includes */
 #include "usbd_cdc_if.h"
 #include "motor.h"
-#include "sensor_switch.h"
+#include "safety_edge.h"
+#include "proximity_switch.h"
 #include <stdint.h>
 #include <stdio.h>
 #include "pressure_sensor.h"

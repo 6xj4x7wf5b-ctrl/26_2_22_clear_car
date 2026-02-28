@@ -37,6 +37,10 @@
 #include "app_protocol_codec.h"
 #include "app_cmd_handle.h"
 
+#include "pressure_sensor.h"
+#include "safety_edge.h"
+#include "proximity_switch.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -104,7 +108,7 @@ const osThreadAttr_t errorTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-static void app_cdc_send_text(const char *text);
+static void app_cdc_send_string(const char *text);
 static void app_push_error(const char *text);
 void app_on_cdc_frame_timeout_isr(void);
 
@@ -257,7 +261,7 @@ void appUartTxTask(void *argument)
     {
       if (app_protocol_encode_cmd_msg(&replyMsg, jsonBuf, sizeof(jsonBuf)) == 0)
       {
-        app_cdc_send_text(jsonBuf);
+        app_cdc_send_string(jsonBuf);
       }
       else
       {
@@ -363,7 +367,7 @@ void appErrorTask(void *argument)
   {
     if (xQueueReceive(errorQueue, &errMsg, portMAX_DELAY) == pdTRUE)
     {
-      // app_cdc_send_text(errMsg.text);
+      // app_cdc_send_string(errMsg.text);
     }
   }
   /* USER CODE END appErrorTask */
@@ -372,7 +376,7 @@ void appErrorTask(void *argument)
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
-static void app_cdc_send_text(const char *text)
+static void app_cdc_send_string(const char *text)
 {
   if (text == NULL)
   {

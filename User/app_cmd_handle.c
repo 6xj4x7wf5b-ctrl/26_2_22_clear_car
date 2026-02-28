@@ -1,6 +1,5 @@
 #include "app_cmd_handle.h"
 #include "motor.h"
-#include "sensor_switch.h"
 #include <stdbool.h>
 #include "cJSON.h"
 #include <string.h>
