@@ -20,6 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "crc.h"
+#include "stm32f4xx_hal.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -32,7 +33,7 @@
 #include "sensor_switch.h"
 #include <stdint.h>
 #include <stdio.h>
-
+#include "pressure_sensor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -109,14 +110,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
   CDC_Transmit_FS((uint8_t *)"System Start\n", 13);
 
+  PressureSensor_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+  // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  // MX_FREERTOS_Init();
 
   /* Start scheduler */
-  osKernelStart();
+  // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -124,11 +126,61 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    // uint8_t edge_states = SafetyEdge_ReadAll();
-    // uint8_t proximity_states = ProximitySwitch_ReadAll();  
-    // sprintf(buffer, "Edge states: %02X, Proximity states: %02X\n", edge_states, proximity_states);
-    // CDC_Transmit_FS((uint8_t *)buffer, (uint16_t)strlen(buffer));
-    // HAL_Delay(1000);
+    if(1)
+    {
+        uint8_t edge_states = SafetyEdge_ReadAll();
+        uint8_t proximity_states = ProximitySwitch_ReadAll();  
+        int32_t weight = 0;
+        PressureSensor_ReadWeight(&weight);
+
+        sprintf(buffer, "Edge states: %02X, Proximity states: %02X, Weight: %ld\n", edge_states, proximity_states, weight);
+        CDC_Transmit_FS((uint8_t *)buffer, (uint16_t)strlen(buffer));
+        HAL_Delay(1000);
+    }
+
+    if(1)
+    {
+      // 机体移动
+      Motor_MoveUp(0.8);
+      HAL_Delay(1000);
+      Motor_MoveDown(0.8);
+      HAL_Delay(1000);
+      Motor_MoveLeft(0.8);
+      HAL_Delay(1000);
+      Motor_MoveRight(0.8);
+      HAL_Delay(1000);
+      Motor_StopMove();
+      HAL_Delay(1000);
+    }
+    if(1)
+    {
+      // 履带升出/下降执行机构
+      Motor_CrawlerLiftUp(0.8);
+      HAL_Delay(1000);
+      Motor_CrawlerLiftDown(0.8);
+      HAL_Delay(1000);
+      
+    }
+
+    if(1)
+    {
+      // 球头锁定执行机构
+      Motor_BallHeadLock( 0.8);
+      HAL_Delay(1000);
+      Motor_BallHeadLock( 0.8);
+      HAL_Delay(1000);
+      Motor_BallHeadStop();
+      HAL_Delay(1000);
+    }
+
+    if(1)
+    {
+      // 滚刷
+      Motor_BrushStart(0.8);
+      HAL_Delay(1000);
+      Motor_BrushStop();
+      HAL_Delay(1000);
+    }
 
     /* USER CODE END WHILE */
 

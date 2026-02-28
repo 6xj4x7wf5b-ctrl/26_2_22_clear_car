@@ -45,8 +45,10 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/motor.c
+    User/pressure_sensor.c
     User/sensor_switch.c
     User/cJSON.c
+    User/app_crc16.c
     User/app_protocol_codec.c
     User/ring_buffer.c
 )

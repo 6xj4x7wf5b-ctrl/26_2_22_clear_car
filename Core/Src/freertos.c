@@ -30,9 +30,9 @@
 
 #include "queue.h"
 #include "semphr.h"
-#include "crc.h"
 #include "tim.h"
 #include "usbd_cdc_if.h"
+#include "app_crc16.h"
 #include "app_protocol_types.h"
 #include "app_protocol_codec.h"
 #include "app_cmd_handle.h"
@@ -48,9 +48,8 @@
 /* USER CODE BEGIN PD */
 #define APP_CDC_FRAME_BUF_SIZE      256U
 #define APP_SENSOR_PERIOD_MS        1000U
-#define APP_PROTO_CRC32_SIZE        4U
-#define APP_PROTO_FRAME_TAIL_SIZE   (APP_PROTO_CRC32_SIZE + 1U)
-#define APP_CRC_WORD_BUF_SIZE       ((APP_CDC_FRAME_BUF_SIZE + 3U) / 4U)
+#define APP_PROTO_CRC16_SIZE        2U
+#define APP_PROTO_FRAME_TAIL_SIZE   (APP_PROTO_CRC16_SIZE + 1U)
 
 /* USER CODE END PD */
 
@@ -107,7 +106,6 @@ const osThreadAttr_t errorTask_attributes = {
 /* USER CODE BEGIN FunctionPrototypes */
 static void app_cdc_send_text(const char *text);
 static void app_push_error(const char *text);
-static uint32_t app_crc32_hw_calculate(const uint8_t *data, uint32_t len);
 void app_on_cdc_frame_timeout_isr(void);
 
 /* USER CODE END FunctionPrototypes */
@@ -199,22 +197,20 @@ void appUartRxTask(void *argument)
       uint32_t readLen = CDC_Read_FS(frameBuf, APP_CDC_FRAME_BUF_SIZE - 1U);
       if (readLen > 0U)
       {
-        // 1. 帧格式初步校验：至少要有CRC32和帧尾\n
+        // 1. 帧格式初步校验：至少要有CRC16和帧尾\n
         if ((readLen <= APP_PROTO_FRAME_TAIL_SIZE) || (frameBuf[readLen - 1U] != (uint8_t)'\n'))
         {
           app_push_error("frame format error\n");
           continue;
         }
-        // 2. CRC32校验
+        // 2. CRC16校验
         uint32_t jsonLen = readLen - APP_PROTO_FRAME_TAIL_SIZE;
-        uint32_t recvCrc = (uint32_t)frameBuf[jsonLen]              // 获取接收到的CRC32值（小端排序）
-                         | ((uint32_t)frameBuf[jsonLen + 1U] << 8U)
-                         | ((uint32_t)frameBuf[jsonLen + 2U] << 16U)
-                         | ((uint32_t)frameBuf[jsonLen + 3U] << 24U);
-        uint32_t calcCrc = app_crc32_hw_calculate(frameBuf, jsonLen);
+        uint16_t recvCrc = (uint16_t)frameBuf[jsonLen]              // 获取接收到的CRC16值（小端排序）
+                         | ((uint16_t)frameBuf[jsonLen + 1U] << 8U);
+        uint16_t calcCrc = app_crc16_compute(frameBuf, (size_t)jsonLen);
         if (recvCrc != calcCrc)
         {
-          app_push_error("crc32 verify failed\n");
+          app_push_error("crc16 verify failed\n");
           continue;
         }
         // 3. 解析并发送到命令处理队列
@@ -340,15 +336,12 @@ void appCmdHandleTask(void *argument)
 void appSensorTask(void *argument)
 {
   /* USER CODE BEGIN appSensorTask */
-  app_cmd_msg_t sensorCmd;
+
 
   /* Infinite loop */
   for(;;)
   {
-    memset(&sensorCmd, 0, sizeof(sensorCmd));
-    snprintf(sensorCmd.text, sizeof(sensorCmd.text), "sensor:update");
-    (void)xQueueSend(cmdQueue, &sensorCmd, 0U);
-    osDelay(APP_SENSOR_PERIOD_MS);
+    
   }
   /* USER CODE END appSensorTask */
 }
@@ -370,7 +363,7 @@ void appErrorTask(void *argument)
   {
     if (xQueueReceive(errorQueue, &errMsg, portMAX_DELAY) == pdTRUE)
     {
-      app_cdc_send_text(errMsg.text);
+      // app_cdc_send_text(errMsg.text);
     }
   }
   /* USER CODE END appErrorTask */
@@ -408,35 +401,8 @@ static void app_push_error(const char *text)
   }
 
   memset(&errMsg, 0, sizeof(errMsg));
-  strncpy(errMsg.text, text, sizeof(errMsg.text) - 1U);
+  // strncpy(errMsg.text, text, sizeof(errMsg.text) - 1U);
   (void)xQueueSend(errorQueue, &errMsg, 0U);
-}
-
-static uint32_t app_crc32_hw_calculate(const uint8_t *data, uint32_t len)
-{
-  uint32_t crcWords[APP_CRC_WORD_BUF_SIZE];
-
-  if (data == NULL)
-  {
-    return 0U;
-  }
-
-  memset(crcWords, 0, sizeof(crcWords));
-
-  for (uint32_t index = 0U; index < len; index++)
-  {
-    uint32_t wordIndex = index / 4U;
-    uint32_t byteShift = (index % 4U) * 8U;
-    crcWords[wordIndex] |= ((uint32_t)data[index] << byteShift);
-  }
-
-  uint32_t wordLen = (len + 3U) / 4U;
-
-  taskENTER_CRITICAL();
-  uint32_t crc = HAL_CRC_Calculate(&hcrc, crcWords, wordLen);
-  taskEXIT_CRITICAL();
-
-  return crc;
 }
 
 void app_on_cdc_frame_timeout_isr(void)
