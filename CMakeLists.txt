@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/motor.c
     User/sensor_switch.c
     User/cJSON.c
+    User/app_protocol_codec.c
     User/ring_buffer.c
 )
 
