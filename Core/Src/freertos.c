@@ -340,7 +340,7 @@ void appCmdHandleTask(void *argument)
 void appSensorTask(void *argument)
 {
   /* USER CODE BEGIN appSensorTask */
-
+  
 
   /* Infinite loop */
   for(;;)
