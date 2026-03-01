@@ -44,7 +44,11 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    User/motor.c
+    User/motor_base.c
+    User/motor_chassis.c
+    User/motor_crawler_lift.c
+    User/motor_ball_head.c
+    User/motor_brush.c
     User/pressure_sensor.c
     User/safety_edge.c
     User/proximity_switch.c
