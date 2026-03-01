@@ -19,23 +19,25 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "stm32f4xx_hal_uart.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "queue.h"
 #include "semphr.h"
 #include "tim.h"
-#include "usbd_cdc_if.h"
 #include "app_crc16.h"
 #include "app_protocol_types.h"
 #include "app_protocol_codec.h"
 #include "app_cmd_handle.h"
+// #include "ring_buffer.h"
 
 #include "pressure_sensor.h"
 #include "safety_edge.h"
@@ -50,16 +52,16 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define APP_CDC_FRAME_BUF_SIZE      256U
-#define APP_SENSOR_PERIOD_MS        1000U
 #define APP_PROTO_CRC16_SIZE        2U
 #define APP_PROTO_FRAME_TAIL_SIZE   (APP_PROTO_CRC16_SIZE + 1U)
 
+#define APP_UART_RECV_BUF_SIZE      1024U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+// uint8_t ring_buffer_storage[APP_RING_BUF_SIZE];
+// ring_buffer_t uartRxRingBuf;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -67,7 +69,9 @@
 static QueueHandle_t cmdQueue;
 static QueueHandle_t replyQueue;
 static QueueHandle_t errorQueue;
-static SemaphoreHandle_t cdcFrameSem;
+static SemaphoreHandle_t uartRecvSem;
+
+static uint8_t uartRecvBuf[APP_UART_RECV_BUF_SIZE];
 
 /* USER CODE END Variables */
 /* Definitions for uartRxTask */
@@ -108,9 +112,7 @@ const osThreadAttr_t errorTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-static void app_cdc_send_string(const char *text);
 static void app_push_error(const char *text);
-void app_on_cdc_frame_timeout_isr(void);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -120,7 +122,6 @@ void appCmdHandleTask(void *argument);
 void appSensorTask(void *argument);
 void appErrorTask(void *argument);
 
-extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /**
@@ -130,7 +131,6 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -138,7 +138,7 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+  uartRecvSem = xSemaphoreCreateBinary();
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -149,7 +149,7 @@ void MX_FREERTOS_Init(void) {
   cmdQueue = xQueueCreate(8U, sizeof(app_cmd_msg_t));
   replyQueue = xQueueCreate(8U, sizeof(app_reply_msg_t));
   errorQueue = xQueueCreate(4U, sizeof(app_error_msg_t));
-  cdcFrameSem = xSemaphoreCreateBinary();
+
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -187,16 +187,15 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_appUartRxTask */
 void appUartRxTask(void *argument)
 {
-  /* init code for USB_DEVICE */
-  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN appUartRxTask */
-  uint8_t frameBuf[APP_CDC_FRAME_BUF_SIZE];
   app_cmd_msg_t cmdMsg;
-
+  uint8_t frameBuf[1024U];
+  
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uartRecvBuf, sizeof(uartRecvBuf) - 1U);
   /* Infinite loop */
   for(;;)
   {
-    if (xSemaphoreTake(cdcFrameSem, portMAX_DELAY) == pdTRUE)
+    if (xSemaphoreTake(uartRecvSem, portMAX_DELAY) == pdTRUE)
     {
       uint32_t readLen = CDC_Read_FS(frameBuf, APP_CDC_FRAME_BUF_SIZE - 1U);
       if (readLen > 0U)
@@ -229,12 +228,6 @@ void appUartRxTask(void *argument)
         {
           app_push_error("cmd queue full\n");
         }
-      }
-
-      if (CDC_RxDroppedFlag_FS() != 0U)
-      {
-        CDC_ClearRxDroppedFlag_FS();
-        app_push_error("cdc rx overflow\n");
       }
     }
   }
@@ -376,24 +369,6 @@ void appErrorTask(void *argument)
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
-static void app_cdc_send_string(const char *text)
-{
-  if (text == NULL)
-  {
-    return;
-  }
-
-  uint16_t len = (uint16_t)strlen(text);
-  if (len == 0U)
-  {
-    return;
-  }
-
-  while (CDC_Transmit_FS((uint8_t *)text, len) == USBD_BUSY)
-  {
-    osDelay(1);
-  }
-}
 
 static void app_push_error(const char *text)
 {
@@ -409,20 +384,13 @@ static void app_push_error(const char *text)
   (void)xQueueSend(errorQueue, &errMsg, 0U);
 }
 
-void app_on_cdc_frame_timeout_isr(void)
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-  BaseType_t higherPrioTaskWoken = pdFALSE;
-
-  if (cdcFrameSem != NULL)
+  if (huart->Instance == USART3)
   {
-    (void)xSemaphoreGiveFromISR(cdcFrameSem, &higherPrioTaskWoken);
+    xSemaphoreGiveFromISR(uartRecvSem, NULL);
   }
-
-  (void)HAL_TIM_Base_Stop_IT(&htim5);
-  __HAL_TIM_SET_COUNTER(&htim5, 0U);
-
-  portYIELD_FROM_ISR(higherPrioTaskWoken);
 }
-
 /* USER CODE END Application */
 

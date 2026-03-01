@@ -19,15 +19,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "crc.h"
+#include "dma.h"
 #include "tim.h"
 #include "usart.h"
-#include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_cdc_if.h"
 #include "motor.h"
 #include "safety_edge.h"
 #include "proximity_switch.h"
@@ -99,16 +97,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM2_Init();
   MX_TIM8_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
-  MX_TIM5_Init();
-  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
-  CDC_Transmit_FS((uint8_t *)"System Start\n", 13);
 
   PressureSensor_Init();
   /* USER CODE END 2 */
@@ -126,61 +122,61 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if(1)
-    {
-        uint8_t edge_states = SafetyEdge_ReadAll();
-        uint8_t proximity_states = ProximitySwitch_ReadAll();  
-        int32_t weight = 0;
-        PressureSensor_ReadWeight(&weight);
+    // if(1)
+    // {
+    //     uint8_t edge_states = SafetyEdge_ReadAll();
+    //     uint8_t proximity_states = ProximitySwitch_ReadAll();  
+    //     int32_t weight = 0;
+    //     PressureSensor_ReadWeight(&weight);
 
-        sprintf(buffer, "Edge states: %02X, Proximity states: %02X, Weight: %ld\n", edge_states, proximity_states, weight);
-        CDC_Transmit_FS((uint8_t *)buffer, (uint16_t)strlen(buffer));
-        HAL_Delay(1000);
-    }
+    //     sprintf(buffer, "Edge states: %02X, Proximity states: %02X, Weight: %ld\n", edge_states, proximity_states, weight);
+    //     HAL_UART_Transmit(&huart3, (uint8_t *)buffer, (uint16_t)strlen(buffer), HAL_MAX_DELAY);
+    //     HAL_Delay(1000);
+    // }
 
-    if(1)
-    {
-      // 机体移动
-      Motor_MoveUp(0.8);
-      HAL_Delay(1000);
-      Motor_MoveDown(0.8);
-      HAL_Delay(1000);
-      Motor_MoveLeft(0.8);
-      HAL_Delay(1000);
-      Motor_MoveRight(0.8);
-      HAL_Delay(1000);
-      Motor_StopMove();
-      HAL_Delay(1000);
-    }
-    if(1)
-    {
-      // 履带升出/下降执行机构
-      Motor_CrawlerLiftUp(0.8);
-      HAL_Delay(1000);
-      Motor_CrawlerLiftDown(0.8);
-      HAL_Delay(1000);
+    // if(1)
+    // {
+    //   // 机体移动
+    //   Motor_MoveUp(0.8);
+    //   HAL_Delay(1000);
+    //   Motor_MoveDown(0.8);
+    //   HAL_Delay(1000);
+    //   Motor_MoveLeft(0.8);
+    //   HAL_Delay(1000);
+    //   Motor_MoveRight(0.8);
+    //   HAL_Delay(1000);
+    //   Motor_StopMove();
+    //   HAL_Delay(1000);
+    // }
+    // if(1)
+    // {
+    //   // 履带升出/下降执行机构
+    //   Motor_CrawlerLiftUp(0.8);
+    //   HAL_Delay(1000);
+    //   Motor_CrawlerLiftDown(0.8);
+    //   HAL_Delay(1000);
       
-    }
+    // }
 
-    if(1)
-    {
-      // 球头锁定执行机构
-      Motor_BallHeadLock( 0.8);
-      HAL_Delay(1000);
-      Motor_BallHeadLock( 0.8);
-      HAL_Delay(1000);
-      Motor_BallHeadStop();
-      HAL_Delay(1000);
-    }
+    // if(1)
+    // {
+    //   // 球头锁定执行机构
+    //   Motor_BallHeadLock( 0.8);
+    //   HAL_Delay(1000);
+    //   Motor_BallHeadLock( 0.8);
+    //   HAL_Delay(1000);
+    //   Motor_BallHeadStop();
+    //   HAL_Delay(1000);
+    // }
 
-    if(1)
-    {
-      // 滚刷
-      Motor_BrushStart(0.8);
-      HAL_Delay(1000);
-      Motor_BrushStop();
-      HAL_Delay(1000);
-    }
+    // if(1)
+    // {
+    //   // 滚刷
+    //   Motor_BrushStart(0.8);
+    //   HAL_Delay(1000);
+    //   Motor_BrushStop();
+    //   HAL_Delay(1000);
+    // }
 
     /* USER CODE END WHILE */
 
@@ -256,10 +252,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-  if (htim->Instance == TIM5)
-  {
-    app_on_cdc_frame_timeout_isr();
-  }
+
 
   /* USER CODE END Callback 1 */
 }
