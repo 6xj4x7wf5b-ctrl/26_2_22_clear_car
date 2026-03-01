@@ -2,11 +2,25 @@
 #define APP_PROTOCOL_TYPES_H
 
 #include <stdint.h>
+#include <stdio.h>
 #include "cJSON.h"
+#include "usart.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define LOG_DEUBG(fmt, ...)                                                          \
+  do                                                                                 \
+  {                                                                                  \
+    char log_buf[128];                                                               \
+    int log_len = snprintf(log_buf, sizeof(log_buf), fmt "\r\n", ##__VA_ARGS__);  \
+    if (log_len > 0)                                                                 \
+    {                                                                                \
+      uint16_t tx_len = (uint16_t)((log_len < (int)sizeof(log_buf)) ? log_len : ((int)sizeof(log_buf) - 1)); \
+      (void)HAL_UART_Transmit(&huart3, (const uint8_t *)log_buf, tx_len, HAL_MAX_DELAY); \
+    }                                                                                \
+  } while (0)
 
 #define APP_MSG_TYPE_STR_LEN   8U
 #define APP_MSG_NAME_STR_LEN   32U

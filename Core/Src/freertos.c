@@ -174,9 +174,7 @@ void appUartRxTask(void *argument)
       memcpy(frameBuf, uartRecvBuf, notifyValue);
       frameBuf[notifyValue] = '\0';
 
-      // 回传接收到的数据（调试用）
-      HAL_UART_Transmit(&huart3, (uint8_t *)"recv: ", 6, HAL_MAX_DELAY);
-      HAL_UART_Transmit(&huart3, (uint8_t *)frameBuf, notifyValue, HAL_MAX_DELAY);
+      LOG_DEUBG("appUartRxTask -> recv: %s", frameBuf);
 
       // 2. 重新启动DMA接收
       HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uartRecvBuf, sizeof(uartRecvBuf) - 1U);
@@ -187,7 +185,7 @@ void appUartRxTask(void *argument)
         // 1. 帧格式初步校验：至少要有CRC16和帧尾\n
         if ((notifyValue <= APP_PROTO_FRAME_TAIL_SIZE) || (frameBuf[notifyValue - 1U] != (uint8_t)'\n'))
         {
-          HAL_UART_Transmit(&huart3, (uint8_t *)"frame format error\n", 19, HAL_MAX_DELAY);
+          LOG_DEUBG("appUartRxTask -> Frame format error");
           continue;
         }
         // 2. CRC16校验
@@ -197,20 +195,20 @@ void appUartRxTask(void *argument)
         uint16_t calcCrc = app_crc16_compute(frameBuf, (size_t)jsonLen);
         if (recvCrc != calcCrc)
         {
-          HAL_UART_Transmit(&huart3, (uint8_t *)"CRC error\n", 10, HAL_MAX_DELAY);
+          LOG_DEUBG("appUartRxTask -> CRC error");
           continue;
         }
         // 3. 解析并发送到命令处理队列
         memset(&cmdMsg, 0, sizeof(cmdMsg));
         if(app_protocol_decode_cmd_msg((const char *)frameBuf, &cmdMsg) != 0)
         {
-          HAL_UART_Transmit(&huart3, (uint8_t *)"decode error\n", 13, HAL_MAX_DELAY);
+          LOG_DEUBG("appUartRxTask -> Decode error");
           continue;
         }
 
         if (xQueueSend(cmdQueue, &cmdMsg, 0U) != pdPASS)
         {
-          HAL_UART_Transmit(&huart3, (uint8_t *)"cmd queue full\n", 15, HAL_MAX_DELAY);
+          LOG_DEUBG("appUartRxTask -> Cmd queue full");
         }
       }
     }
@@ -242,7 +240,7 @@ void appUartTxTask(void *argument)
 
         if ((jsonLen + APP_PROTO_FRAME_TAIL_SIZE) > sizeof(uartSendBuf))
         {
-          HAL_UART_Transmit(&huart3, (uint8_t *)"reply too long\n", 15, HAL_MAX_DELAY);
+          LOG_DEUBG("appUartTxTask -> Reply too long");
           continue;
         }
 
@@ -255,7 +253,7 @@ void appUartTxTask(void *argument)
       }
       else
       {
-        HAL_UART_Transmit(&huart3, (uint8_t *)"reply encode error\n", 19, HAL_MAX_DELAY);
+        LOG_DEUBG("appUartTxTask -> Reply encode error");
       }
 
     }
@@ -313,7 +311,7 @@ void appCmdHandleTask(void *argument)
 
       if (xQueueSend(replyQueue, &replyMsg, 0U) != pdPASS)
       {
-        HAL_UART_Transmit(&huart3, (uint8_t *)" reply queue full\n", 18, HAL_MAX_DELAY);
+        LOG_DEUBG("appCmdHandleTask -> Reply queue full");
       }
     }
   }
