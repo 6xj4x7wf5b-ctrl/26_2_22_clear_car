@@ -31,7 +31,6 @@
 #include <string.h>
 
 #include "queue.h"
-#include "semphr.h"
 #include "tim.h"
 #include "app_crc16.h"
 #include "app_protocol_types.h"
@@ -55,7 +54,6 @@
 #define APP_PROTO_CRC16_SIZE        2U
 #define APP_PROTO_FRAME_TAIL_SIZE   (APP_PROTO_CRC16_SIZE + 1U)
 
-#define APP_UART_RECV_BUF_SIZE      1024U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -69,9 +67,9 @@
 static QueueHandle_t cmdQueue;
 static QueueHandle_t replyQueue;
 static QueueHandle_t errorQueue;
-static SemaphoreHandle_t uartRecvSem;
+static TaskHandle_t uartRxTaskNotifyHandle;
 
-static uint8_t uartRecvBuf[APP_UART_RECV_BUF_SIZE];
+
 
 /* USER CODE END Variables */
 /* Definitions for uartRxTask */
@@ -138,7 +136,6 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  uartRecvSem = xSemaphoreCreateBinary();
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -190,24 +187,35 @@ void appUartRxTask(void *argument)
   /* USER CODE BEGIN appUartRxTask */
   app_cmd_msg_t cmdMsg;
   uint8_t frameBuf[1024U];
+  uint8_t uartRecvBuf[1024U];
+  uint32_t notifyValue = 0U;
+
+  uartRxTaskNotifyHandle = xTaskGetCurrentTaskHandle();
   
   HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uartRecvBuf, sizeof(uartRecvBuf) - 1U);
   /* Infinite loop */
   for(;;)
   {
-    if (xSemaphoreTake(uartRecvSem, portMAX_DELAY) == pdTRUE)
+    if (xTaskNotifyWait(0U, UINT32_MAX, &notifyValue, portMAX_DELAY) == pdTRUE)
     {
-      uint32_t readLen = CDC_Read_FS(frameBuf, APP_CDC_FRAME_BUF_SIZE - 1U);
-      if (readLen > 0U)
+      // 1. 从DMA接收缓冲区复制数据到帧缓冲区，并添加字符串结束符
+      memcpy(frameBuf, uartRecvBuf, notifyValue);
+      frameBuf[notifyValue] = '\0';
+
+      // 2. 重新启动DMA接收
+      HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uartRecvBuf, sizeof(uartRecvBuf) - 1U);
+
+      // 3. 处理接收到的数据
+      if (notifyValue > 0U)
       {
         // 1. 帧格式初步校验：至少要有CRC16和帧尾\n
-        if ((readLen <= APP_PROTO_FRAME_TAIL_SIZE) || (frameBuf[readLen - 1U] != (uint8_t)'\n'))
+        if ((notifyValue <= APP_PROTO_FRAME_TAIL_SIZE) || (frameBuf[notifyValue - 1U] != (uint8_t)'\n'))
         {
           app_push_error("frame format error\n");
           continue;
         }
         // 2. CRC16校验
-        uint32_t jsonLen = readLen - APP_PROTO_FRAME_TAIL_SIZE;
+        uint32_t jsonLen = notifyValue - APP_PROTO_FRAME_TAIL_SIZE;
         uint16_t recvCrc = (uint16_t)frameBuf[jsonLen]              // 获取接收到的CRC16值（小端排序）
                          | ((uint16_t)frameBuf[jsonLen + 1U] << 8U);
         uint16_t calcCrc = app_crc16_compute(frameBuf, (size_t)jsonLen);
@@ -245,16 +253,29 @@ void appUartTxTask(void *argument)
 {
   /* USER CODE BEGIN appUartTxTask */
   app_reply_msg_t replyMsg;
+  char uartSendBuf[1024U];
 
   /* Infinite loop */
   for(;;)
   {
-    char jsonBuf[2048U];
     if (xQueueReceive(replyQueue, &replyMsg, portMAX_DELAY) == pdTRUE)
     {
-      if (app_protocol_encode_cmd_msg(&replyMsg, jsonBuf, sizeof(jsonBuf)) == 0)
+      if (app_protocol_encode_cmd_msg(&replyMsg, uartSendBuf, sizeof(uartSendBuf)) == 0)
       {
-        app_cdc_send_string(jsonBuf);
+        uint32_t jsonLen = (uint32_t)strlen(uartSendBuf);
+
+        if ((jsonLen + APP_PROTO_FRAME_TAIL_SIZE) > sizeof(uartSendBuf))
+        {
+          app_push_error("reply frame too long\n");
+          continue;
+        }
+
+        uint16_t crc = app_crc16_compute((const uint8_t *)uartSendBuf, (size_t)jsonLen);
+        uartSendBuf[jsonLen] = (char)(crc & 0xFFU);
+        uartSendBuf[jsonLen + 1U] = (char)((crc >> 8U) & 0xFFU);
+        uartSendBuf[jsonLen + 2U] = '\n';
+
+        HAL_UART_Transmit(&huart3, (uint8_t *)uartSendBuf, jsonLen + APP_PROTO_FRAME_TAIL_SIZE, HAL_MAX_DELAY);
       }
       else
       {
@@ -360,7 +381,7 @@ void appErrorTask(void *argument)
   {
     if (xQueueReceive(errorQueue, &errMsg, portMAX_DELAY) == pdTRUE)
     {
-      // app_cdc_send_string(errMsg.text);
+      (void)errMsg;
     }
   }
   /* USER CODE END appErrorTask */
@@ -389,7 +410,16 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
   if (huart->Instance == USART3)
   {
-    xSemaphoreGiveFromISR(uartRecvSem, NULL);
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    if (uartRxTaskNotifyHandle != NULL)
+    {
+      (void)xTaskNotifyFromISR(uartRxTaskNotifyHandle,
+                               (uint32_t)Size,
+                               eSetValueWithOverwrite,
+                               &xHigherPriorityTaskWoken);
+      portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
   }
 }
 /* USER CODE END Application */
