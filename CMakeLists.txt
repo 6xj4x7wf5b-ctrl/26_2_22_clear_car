@@ -50,8 +50,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/proximity_switch.c
     User/cJSON.c
     User/app_crc16.c
+    User/app_cmd_handle.c
     User/app_protocol_codec.c
-    User/ring_buffer.c
 )
 
 # Add include paths

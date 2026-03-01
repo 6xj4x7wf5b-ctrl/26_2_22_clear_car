@@ -58,8 +58,13 @@ typedef struct
   char msg_name[APP_MSG_NAME_STR_LEN];
   uint64_t timestamp;
   cJSON *data_json;;
-} app_cmd_msg_t,app_reply_msg_t,app_error_msg_t;
+} app_cmd_msg_t,app_reply_msg_t;
 
+
+typedef struct
+{
+  char text[64];
+} app_error_msg_t;
 
 typedef struct
 {

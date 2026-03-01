@@ -19,7 +19,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
-#include "stm32f4xx_hal_uart.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -36,11 +35,11 @@
 #include "app_protocol_types.h"
 #include "app_protocol_codec.h"
 #include "app_cmd_handle.h"
-// #include "ring_buffer.h"
 
 #include "pressure_sensor.h"
 #include "safety_edge.h"
 #include "proximity_switch.h"
+#include "usart.h"
 
 /* USER CODE END Includes */
 
@@ -76,29 +75,22 @@ static TaskHandle_t uartRxTaskNotifyHandle;
 osThreadId_t uartRxTaskHandle;
 const osThreadAttr_t uartRxTask_attributes = {
   .name = "uartRxTask",
-  .stack_size = 256 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for uartTxTask */
 osThreadId_t uartTxTaskHandle;
 const osThreadAttr_t uartTxTask_attributes = {
   .name = "uartTxTask",
-  .stack_size = 256 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for cmdHandleTask */
 osThreadId_t cmdHandleTaskHandle;
 const osThreadAttr_t cmdHandleTask_attributes = {
   .name = "cmdHandleTask",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for sensorTask */
-osThreadId_t sensorTaskHandle;
-const osThreadAttr_t sensorTask_attributes = {
-  .name = "sensorTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for errorTask */
 osThreadId_t errorTaskHandle;
@@ -110,14 +102,12 @@ const osThreadAttr_t errorTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-static void app_push_error(const char *text);
 
 /* USER CODE END FunctionPrototypes */
 
 void appUartRxTask(void *argument);
 void appUartTxTask(void *argument);
 void appCmdHandleTask(void *argument);
-void appSensorTask(void *argument);
 void appErrorTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -159,9 +149,6 @@ void MX_FREERTOS_Init(void) {
   /* creation of cmdHandleTask */
   cmdHandleTaskHandle = osThreadNew(appCmdHandleTask, NULL, &cmdHandleTask_attributes);
 
-  /* creation of sensorTask */
-  sensorTaskHandle = osThreadNew(appSensorTask, NULL, &sensorTask_attributes);
-
   /* creation of errorTask */
   errorTaskHandle = osThreadNew(appErrorTask, NULL, &errorTask_attributes);
 
@@ -201,6 +188,8 @@ void appUartRxTask(void *argument)
       // 1. 从DMA接收缓冲区复制数据到帧缓冲区，并添加字符串结束符
       memcpy(frameBuf, uartRecvBuf, notifyValue);
       frameBuf[notifyValue] = '\0';
+      // // 测试
+      HAL_UART_Transmit(&huart3, (uint8_t *)frameBuf, notifyValue, HAL_MAX_DELAY);
 
       // 2. 重新启动DMA接收
       HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uartRecvBuf, sizeof(uartRecvBuf) - 1U);
@@ -211,7 +200,7 @@ void appUartRxTask(void *argument)
         // 1. 帧格式初步校验：至少要有CRC16和帧尾\n
         if ((notifyValue <= APP_PROTO_FRAME_TAIL_SIZE) || (frameBuf[notifyValue - 1U] != (uint8_t)'\n'))
         {
-          app_push_error("frame format error\n");
+          HAL_UART_Transmit(&huart3, (uint8_t *)"frame format error\n", 19, HAL_MAX_DELAY);
           continue;
         }
         // 2. CRC16校验
@@ -221,20 +210,20 @@ void appUartRxTask(void *argument)
         uint16_t calcCrc = app_crc16_compute(frameBuf, (size_t)jsonLen);
         if (recvCrc != calcCrc)
         {
-          app_push_error("crc16 verify failed\n");
+          HAL_UART_Transmit(&huart3, (uint8_t *)"CRC error\n", 10, HAL_MAX_DELAY);
           continue;
         }
         // 3. 解析并发送到命令处理队列
         memset(&cmdMsg, 0, sizeof(cmdMsg));
         if(app_protocol_decode_cmd_msg((const char *)frameBuf, &cmdMsg) != 0)
         {
-          app_push_error("cmd parse error\n");
+          HAL_UART_Transmit(&huart3, (uint8_t *)"decode error\n", 13, HAL_MAX_DELAY);
           continue;
         }
 
         if (xQueueSend(cmdQueue, &cmdMsg, 0U) != pdPASS)
         {
-          app_push_error("cmd queue full\n");
+          HAL_UART_Transmit(&huart3, (uint8_t *)"cmd queue full\n", 15, HAL_MAX_DELAY);
         }
       }
     }
@@ -266,7 +255,7 @@ void appUartTxTask(void *argument)
 
         if ((jsonLen + APP_PROTO_FRAME_TAIL_SIZE) > sizeof(uartSendBuf))
         {
-          app_push_error("reply frame too long\n");
+          HAL_UART_Transmit(&huart3, (uint8_t *)"reply too long\n", 15, HAL_MAX_DELAY);
           continue;
         }
 
@@ -279,7 +268,7 @@ void appUartTxTask(void *argument)
       }
       else
       {
-        app_push_error("reply encode error\n");
+        HAL_UART_Transmit(&huart3, (uint8_t *)"reply encode error\n", 19, HAL_MAX_DELAY);
       }
 
     }
@@ -335,33 +324,13 @@ void appCmdHandleTask(void *argument)
           break;
       }
 
-        if (xQueueSend(replyQueue, &replyMsg, 0U) != pdPASS)
-        {
-          app_push_error(" reply queue full\n");
-        }
+      if (xQueueSend(replyQueue, &replyMsg, 0U) != pdPASS)
+      {
+        HAL_UART_Transmit(&huart3, (uint8_t *)" reply queue full\n", 18, HAL_MAX_DELAY);
+      }
     }
   }
   /* USER CODE END appCmdHandleTask */
-}
-
-/* USER CODE BEGIN Header_appSensorTask */
-/**
-* @brief Function implementing the sensorTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_appSensorTask */
-void appSensorTask(void *argument)
-{
-  /* USER CODE BEGIN appSensorTask */
-  
-
-  /* Infinite loop */
-  for(;;)
-  {
-    
-  }
-  /* USER CODE END appSensorTask */
 }
 
 /* USER CODE BEGIN Header_appErrorTask */
@@ -389,21 +358,6 @@ void appErrorTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-
-
-static void app_push_error(const char *text)
-{
-  app_error_msg_t errMsg;
-
-  if (text == NULL)
-  {
-    return;
-  }
-
-  memset(&errMsg, 0, sizeof(errMsg));
-  // strncpy(errMsg.text, text, sizeof(errMsg.text) - 1U);
-  (void)xQueueSend(errorQueue, &errMsg, 0U);
-}
 
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)

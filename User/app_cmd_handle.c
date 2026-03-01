@@ -2,7 +2,9 @@
 #include "motor.h"
 #include <stdbool.h>
 #include "cJSON.h"
+#include <stdio.h>
 #include <string.h>
+#include <sys/_intsup.h>
 
 
 static bool create_reply_msg(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg, int msg_type_id, const char *result, int error_code, const char *error_message)
@@ -13,9 +15,8 @@ static bool create_reply_msg(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *reply
     memset(replyMsg, 0, sizeof(app_reply_msg_t));
     replyMsg->msg_type_id = msg_type_id;  // ACK类型
     replyMsg->msg_seq = cmdMsg->msg_seq;
-    strncpy(replyMsg->msg_type, "ack", APP_MSG_TYPE_STR_LEN - 1U);
-    strncpy(replyMsg->msg_name, "ack_", APP_MSG_NAME_STR_LEN - 1U);
-    strncat(replyMsg->msg_name, cmdMsg->msg_name, APP_MSG_NAME_STR_LEN - strlen(replyMsg->msg_name) - 1U);
+    (void)snprintf(replyMsg->msg_type, APP_MSG_TYPE_STR_LEN, "%s", "ack");
+    (void)snprintf(replyMsg->msg_name, APP_MSG_NAME_STR_LEN, "ack_%s", cmdMsg->msg_name);
     replyMsg->timestamp = (uint64_t)HAL_GetTick();
 
     cJSON *data_json = cJSON_CreateObject();
@@ -49,7 +50,7 @@ static bool parse_move_cmd(const app_cmd_msg_t *cmdMsg, char *direction, float *
     cJSON *item = cJSON_GetObjectItem(cmdMsg->data_json, "direction");
     if (!cJSON_IsString(item))
         return false;
-    strncpy(direction, item->valuestring, 15U);
+    (void)snprintf(direction, 16U, "%s", item->valuestring);
 
     item = cJSON_GetObjectItem(cmdMsg->data_json, "speed");
     if (!cJSON_IsNumber(item))
@@ -67,7 +68,7 @@ static bool parse_movexy_cmd(const app_cmd_msg_t *cmdMsg, char *direction_xy, fl
     cJSON *item = cJSON_GetObjectItem(cmdMsg->data_json, "lr_direction");
     if (!cJSON_IsString(item))
         return false;
-    strncpy(direction_lr, item->valuestring, 15U);
+    (void)snprintf(direction_lr, 16U, "%s", item->valuestring);
 
     item = cJSON_GetObjectItem(cmdMsg->data_json, "lr_speed");
     if (!cJSON_IsNumber(item))
@@ -77,7 +78,7 @@ static bool parse_movexy_cmd(const app_cmd_msg_t *cmdMsg, char *direction_xy, fl
     item = cJSON_GetObjectItem(cmdMsg->data_json, "ud_direction");
     if (!cJSON_IsString(item))
         return false;
-    strncpy(direction_xy, item->valuestring, 15U);
+    (void)snprintf(direction_xy, 16U, "%s", item->valuestring);
 
     item = cJSON_GetObjectItem(cmdMsg->data_json, "ud_speed");
     if (!cJSON_IsNumber(item))
@@ -87,6 +88,49 @@ static bool parse_movexy_cmd(const app_cmd_msg_t *cmdMsg, char *direction_xy, fl
     return true;
 }
 
+static bool parse_track_switch_cmd(const app_cmd_msg_t *cmdMsg, char *track_mode)
+{
+    if (!cmdMsg || !track_mode)
+        return false;
+
+    cJSON *item = cJSON_GetObjectItem(cmdMsg->data_json, "track_mode");
+    if (!cJSON_IsString(item))
+        return false;
+    (void)snprintf(track_mode, 16U, "%s", item->valuestring);
+
+    return true;
+}
+
+static bool parse_ball_lock_cmd(const app_cmd_msg_t *cmdMsg, char *action)
+{
+    if (!cmdMsg || !action)
+        return false;
+
+    cJSON *item = cJSON_GetObjectItem(cmdMsg->data_json, "action");
+    if (!cJSON_IsString(item))
+        return false;
+    (void)snprintf(action, 16U, "%s", item->valuestring);
+
+    return true;
+}
+
+static bool parse_brush_control_cmd(const app_cmd_msg_t *cmdMsg, char *action, float *speed)
+{
+    if (!cmdMsg || !action || !speed)
+        return false;
+
+    cJSON *item = cJSON_GetObjectItem(cmdMsg->data_json, "action");
+    if (!cJSON_IsString(item))
+        return false;
+    (void)snprintf(action, 16U, "%s", item->valuestring);
+
+    item = cJSON_GetObjectItem(cmdMsg->data_json, "speed");
+    if (!cJSON_IsNumber(item))
+        return false;
+    *speed = (float)item->valuedouble;
+
+    return true;
+}
 
 bool app_move_lr_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
 {
@@ -222,19 +266,91 @@ bool app_move_xy_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
 
 bool app_track_switch_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
 {
-    // 处理跟踪开关命令的逻辑
+    char track_mode[16];
+    if (!cmdMsg || !replyMsg)
+        return false;
+
+    if(!parse_track_switch_cmd(cmdMsg, track_mode))
+    {
+        create_reply_msg(cmdMsg, replyMsg, 0x13, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Invalid command");
+        return false;
+    }
+
+    if(strcmp(track_mode, "crawler") == 0)      // 履带模式
+    {
+        // TrackSwitch_On();
+    }
+    else if(strcmp(track_mode, "wheel") == 0)   // 轮式模式
+    {
+        // TrackSwitch_Off();
+    }
+    else
+    {
+        create_reply_msg(cmdMsg, replyMsg, 0x13, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Invalid command");
+        return false;
+    }
+
+    create_reply_msg(cmdMsg, replyMsg, 0x13, "success", APP_ERROR_CODE_NONE, "Command executed successfully");
     return true;
 }
 
 bool app_ball_lock_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
 {
-    // 处理球头锁定命令的逻辑
+    char action[16];
+    if (!cmdMsg || !replyMsg)
+        return false;
+
+    if(!parse_ball_lock_cmd(cmdMsg, action))
+    {
+        create_reply_msg(cmdMsg, replyMsg, 0x14, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Invalid command");
+        return false;
+    }
+
+    if(strcmp(action, "lock") == 0)
+    {
+        // BallLock_On();
+    }
+    else if(strcmp(action, "unlock") == 0)
+    {
+        // BallLock_Off();
+    }
+    else
+    {
+        create_reply_msg(cmdMsg, replyMsg, 0x14, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Invalid command");
+        return false;
+    }
+
+    create_reply_msg(cmdMsg, replyMsg, 0x14, "success", APP_ERROR_CODE_NONE, "Command executed successfully");
     return true;
 }
 
 bool app_brush_control_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
 {
-    // 处理滚刷控制命令的逻辑
+    char action[16];
+    float speed;
+    if (!cmdMsg || !replyMsg)
+        return false;
+    if(!parse_brush_control_cmd(cmdMsg, action, &speed))
+    {
+        create_reply_msg(cmdMsg, replyMsg, 0x15, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Invalid command");
+        return false;
+    }
+
+    if(strcmp(action, "start") == 0)
+    {
+        // Brush_Start(speed);
+    }
+    else if(strcmp(action, "stop") == 0)
+    {
+        // Brush_Stop();
+    }
+    else
+    {
+        create_reply_msg(cmdMsg, replyMsg, 0x15, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Invalid command");
+        return false;
+    }
+
+    create_reply_msg(cmdMsg, replyMsg, 0x15, "success", APP_ERROR_CODE_NONE, "Command executed successfully");
     return true;
 }
 
