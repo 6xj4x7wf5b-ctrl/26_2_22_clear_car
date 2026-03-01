@@ -61,20 +61,7 @@ typedef struct
 } app_cmd_msg_t,app_reply_msg_t;
 
 
-typedef struct
-{
-  char text[64];
-} app_error_msg_t;
 
-typedef struct
-{
-  uint32_t pressure;
-  uint8_t safety_edge_triggered;
-  uint8_t device_status;
-  float imu_accel_x;
-  float imu_accel_y;
-  float imu_accel_z;
-} app_device_status_t;
 
 #ifdef __cplusplus
 }

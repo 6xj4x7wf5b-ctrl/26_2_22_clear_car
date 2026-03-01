@@ -57,18 +57,15 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-// uint8_t ring_buffer_storage[APP_RING_BUF_SIZE];
-// ring_buffer_t uartRxRingBuf;
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 static QueueHandle_t cmdQueue;
 static QueueHandle_t replyQueue;
-static QueueHandle_t errorQueue;
+
 static TaskHandle_t uartRxTaskNotifyHandle;
-
-
 
 /* USER CODE END Variables */
 /* Definitions for uartRxTask */
@@ -92,13 +89,6 @@ const osThreadAttr_t cmdHandleTask_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for errorTask */
-osThreadId_t errorTaskHandle;
-const osThreadAttr_t errorTask_attributes = {
-  .name = "errorTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
-};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -108,7 +98,6 @@ const osThreadAttr_t errorTask_attributes = {
 void appUartRxTask(void *argument);
 void appUartTxTask(void *argument);
 void appCmdHandleTask(void *argument);
-void appErrorTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -135,7 +124,6 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_QUEUES */
   cmdQueue = xQueueCreate(8U, sizeof(app_cmd_msg_t));
   replyQueue = xQueueCreate(8U, sizeof(app_reply_msg_t));
-  errorQueue = xQueueCreate(4U, sizeof(app_error_msg_t));
 
   /* USER CODE END RTOS_QUEUES */
 
@@ -148,9 +136,6 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of cmdHandleTask */
   cmdHandleTaskHandle = osThreadNew(appCmdHandleTask, NULL, &cmdHandleTask_attributes);
-
-  /* creation of errorTask */
-  errorTaskHandle = osThreadNew(appErrorTask, NULL, &errorTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -188,7 +173,9 @@ void appUartRxTask(void *argument)
       // 1. 从DMA接收缓冲区复制数据到帧缓冲区，并添加字符串结束符
       memcpy(frameBuf, uartRecvBuf, notifyValue);
       frameBuf[notifyValue] = '\0';
-      // // 测试
+
+      // 回传接收到的数据（调试用）
+      HAL_UART_Transmit(&huart3, (uint8_t *)"recv: ", 6, HAL_MAX_DELAY);
       HAL_UART_Transmit(&huart3, (uint8_t *)frameBuf, notifyValue, HAL_MAX_DELAY);
 
       // 2. 重新启动DMA接收
@@ -331,29 +318,6 @@ void appCmdHandleTask(void *argument)
     }
   }
   /* USER CODE END appCmdHandleTask */
-}
-
-/* USER CODE BEGIN Header_appErrorTask */
-/**
-* @brief Function implementing the errorTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_appErrorTask */
-void appErrorTask(void *argument)
-{
-  /* USER CODE BEGIN appErrorTask */
-  app_error_msg_t errMsg;
-
-  /* Infinite loop */
-  for(;;)
-  {
-    if (xQueueReceive(errorQueue, &errMsg, portMAX_DELAY) == pdTRUE)
-    {
-      (void)errMsg;
-    }
-  }
-  /* USER CODE END appErrorTask */
 }
 
 /* Private application code --------------------------------------------------*/
