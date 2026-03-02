@@ -89,6 +89,13 @@ const osThreadAttr_t cmdHandleTask_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for statusTask */
+osThreadId_t statusTaskHandle;
+const osThreadAttr_t statusTask_attributes = {
+  .name = "statusTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -98,6 +105,7 @@ const osThreadAttr_t cmdHandleTask_attributes = {
 void appUartRxTask(void *argument);
 void appUartTxTask(void *argument);
 void appCmdHandleTask(void *argument);
+void appStatusTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -136,6 +144,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of cmdHandleTask */
   cmdHandleTaskHandle = osThreadNew(appCmdHandleTask, NULL, &cmdHandleTask_attributes);
+
+  /* creation of statusTask */
+  statusTaskHandle = osThreadNew(appStatusTask, NULL, &statusTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -316,6 +327,24 @@ void appCmdHandleTask(void *argument)
     }
   }
   /* USER CODE END appCmdHandleTask */
+}
+
+/* USER CODE BEGIN Header_appStatusTask */
+/**
+* @brief Function implementing the statusTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_appStatusTask */
+void appStatusTask(void *argument)
+{
+  /* USER CODE BEGIN appStatusTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END appStatusTask */
 }
 
 /* Private application code --------------------------------------------------*/

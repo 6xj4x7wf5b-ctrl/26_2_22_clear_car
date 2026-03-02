@@ -16,7 +16,7 @@ static bool create_reply_msg(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *reply
     replyMsg->msg_type_id = msg_type_id;  // ACK类型
     replyMsg->msg_seq = cmdMsg->msg_seq;
     (void)snprintf(replyMsg->msg_type, APP_MSG_TYPE_STR_LEN, "%s", "ack");
-    (void)snprintf(replyMsg->msg_name, APP_MSG_NAME_STR_LEN, "ack_%s", cmdMsg->msg_name);
+    (void)snprintf(replyMsg->msg_name, APP_MSG_NAME_STR_LEN, "ack_%.*s", (int)(APP_MSG_NAME_STR_LEN - sizeof("ack_")), cmdMsg->msg_name);
     replyMsg->timestamp = (uint64_t)HAL_GetTick();
 
     cJSON *data_json = cJSON_CreateObject();
@@ -149,15 +149,15 @@ bool app_move_lr_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
         
     if(strcmp(direction, "left") == 0)
     {
-        Motor_MoveLeft(speed);
+        Motor_ChassisMoveLeft(speed);
     }
     else if(strcmp(direction, "right") == 0)
     {
-        Motor_MoveRight(speed);
+        Motor_ChassisMoveRight(speed);
     }
     else if(strcmp(direction, "stop") == 0)
     {
-        Motor_StopMove();
+        Motor_ChassisStopMove();
     }
     else {
         create_reply_msg(cmdMsg, replyMsg, 0x10, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Invalid command");
@@ -186,15 +186,15 @@ bool app_move_ud_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
 
     if(strcmp(direction, "up") == 0)
     {
-        Motor_MoveUp(speed);
+        Motor_ChassisMoveUp(speed);
     }
     else if(strcmp(direction, "down") == 0)
     {
-        Motor_MoveDown(speed);
+        Motor_ChassisMoveDown(speed);
     }
     else if(strcmp(direction, "stop") == 0)
     {
-        Motor_StopMove();
+        Motor_ChassisStopMove();
     }
     else
     {
@@ -225,15 +225,15 @@ bool app_move_xy_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
     // 处理XY移动命令的逻辑
     if(strcmp(direction_lr, "left") == 0)
     {
-        Motor_MoveLeft(speed_lr);
+        Motor_ChassisMoveLeft(speed_lr);
     }
     else if(strcmp(direction_lr, "right") == 0)
     {
-        Motor_MoveRight(speed_lr);
+        Motor_ChassisMoveRight(speed_lr);
     }
     else if(strcmp(direction_lr, "stop") == 0)
     {
-        Motor_StopMove();
+        Motor_ChassisStopMove();
     }
     else
     {
@@ -243,15 +243,15 @@ bool app_move_xy_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg)
     // 处理UD移动命令的逻辑
     if(strcmp(direction_xy, "up") == 0)
     {
-        Motor_MoveUp(speed_xy);
+        Motor_ChassisMoveUp(speed_xy);
     }
     else if(strcmp(direction_xy, "down") == 0)
     {
-        Motor_MoveDown(speed_xy);
+        Motor_ChassisMoveDown(speed_xy);
     }
     else if(strcmp(direction_xy, "stop") == 0)
     {
-        Motor_StopMove();
+        Motor_ChassisStopMove();
     }
     else
     {
@@ -278,11 +278,11 @@ bool app_track_switch_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *reply
 
     if(strcmp(track_mode, "crawler") == 0)      // 履带模式
     {
-        // TrackSwitch_On();
+        Motor_CrawlerLiftUp();
     }
     else if(strcmp(track_mode, "wheel") == 0)   // 轮式模式
     {
-        // TrackSwitch_Off();
+        Motor_CrawlerLiftDown();
     }
     else
     {
@@ -308,11 +308,11 @@ bool app_ball_lock_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg
 
     if(strcmp(action, "lock") == 0)
     {
-        // BallLock_On();
+        Motor_BallHeadLock();
     }
     else if(strcmp(action, "unlock") == 0)
     {
-        // BallLock_Off();
+        Motor_BallHeadUnlock();
     }
     else
     {
@@ -338,11 +338,11 @@ bool app_brush_control_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *repl
 
     if(strcmp(action, "start") == 0)
     {
-        // Brush_Start(speed);
+        Motor_BrushStart(speed);
     }
     else if(strcmp(action, "stop") == 0)
     {
-        // Brush_Stop();
+        Motor_BrushStop();
     }
     else
     {
