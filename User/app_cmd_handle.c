@@ -156,7 +156,7 @@ bool create_cmd_reply_msg(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *replyMsg
         goto error;
     if(!cJSON_AddNumberToObject(data_json, "error_code", error_code))
         goto error;
-    if(!cJSON_AddStringToObject(data_json, "error_message", error_message))
+    if(!cJSON_AddStringToObject(data_json, "error_msg", error_message))
         goto error;
 
     replyMsg->data_json = data_json;
@@ -474,11 +474,11 @@ bool app_track_switch_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *reply
         return false;
     }
 
-    if(strcmp(track_mode, "crawler") == 0)      // 履带模式
+    if(strcmp(track_mode, "extend") == 0)      // 履带模式
     {
         Motor_CrawlerLiftUp();
     }
-    else if(strcmp(track_mode, "wheel") == 0)   // 轮式模式
+    else if(strcmp(track_mode, "retract") == 0)   // 轮式模式
     {
         Motor_CrawlerLiftDown();
     }

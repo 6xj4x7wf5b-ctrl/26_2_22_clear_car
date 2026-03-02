@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "cJSON.h"
-#include "usart.h"
+#include "usbd_cdc_if.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,7 +18,7 @@ extern "C" {
     if (log_len > 0)                                                                 \
     {                                                                                \
       uint16_t tx_len = (uint16_t)((log_len < (int)sizeof(log_buf)) ? log_len : ((int)sizeof(log_buf) - 1)); \
-      (void)HAL_UART_Transmit(&huart3, (const uint8_t *)log_buf, tx_len, HAL_MAX_DELAY); \
+      (void)CDC_Transmit_FS((uint8_t *)log_buf, tx_len);                            \
     }                                                                                \
   } while (0)
 
