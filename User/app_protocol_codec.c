@@ -72,7 +72,7 @@ error:
     return -1;
 }
 
-int app_protocol_encode_cmd_msg(const app_cmd_msg_t *msg, char *out_json, size_t out_json_size)
+int app_protocol_encode_reply_msg(const app_reply_msg_t *msg, char *out_json, size_t out_json_size)
 {
     if (!msg || !out_json || out_json_size == 0U)
         return -1;
@@ -95,6 +95,7 @@ int app_protocol_encode_cmd_msg(const app_cmd_msg_t *msg, char *out_json, size_t
 
     if (!cJSON_AddNumberToObject(root, "timestamp", (double)msg->timestamp))
         goto error;
+
 
     if (msg->data_json)
     {
@@ -135,6 +136,18 @@ error:
 
 
 void app_protocol_free_cmd_msg(app_cmd_msg_t *msg)
+{
+    if (!msg)
+        return;
+
+    if (msg->data_json)
+    {
+        cJSON_Delete(msg->data_json);
+        msg->data_json = NULL;
+    }
+}
+
+void app_protocol_free_reply_msg(app_reply_msg_t *msg)
 {
     if (!msg)
         return;

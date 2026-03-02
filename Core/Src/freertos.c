@@ -25,6 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -99,6 +101,7 @@ const osThreadAttr_t statusTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
+bool app_msg_add_crc16_and_lf(uint8_t *buf, uint32_t bufSize, uint32_t* finnalLen);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -238,35 +241,30 @@ void appUartTxTask(void *argument)
 {
   /* USER CODE BEGIN appUartTxTask */
   app_reply_msg_t replyMsg;
-  char uartSendBuf[1024U];
+
+  uint8_t uartSendBuf[1024U];
+  uint32_t finnalDataLen = 0;
 
   /* Infinite loop */
   for(;;)
   {
-    if (xQueueReceive(replyQueue, &replyMsg, portMAX_DELAY) == pdTRUE)
+    if (xQueueReceive(replyQueue, &replyMsg, 0U) == pdTRUE)
     {
-      if (app_protocol_encode_cmd_msg(&replyMsg, uartSendBuf, sizeof(uartSendBuf)) == 0)
+      if (app_protocol_encode_reply_msg(&replyMsg, (char *)uartSendBuf, sizeof(uartSendBuf)) == 0)
       {
-        uint32_t jsonLen = (uint32_t)strlen(uartSendBuf);
-
-        if ((jsonLen + APP_PROTO_FRAME_TAIL_SIZE) > sizeof(uartSendBuf))
+        if(!app_msg_add_crc16_and_lf(uartSendBuf, sizeof(uartSendBuf), &finnalDataLen))
         {
-          LOG_DEUBG("appUartTxTask -> Reply too long");
+          LOG_DEUBG("appUartTxTask -> Failed to add CRC16 and LF");
           continue;
         }
-
-        uint16_t crc = app_crc16_compute((const uint8_t *)uartSendBuf, (size_t)jsonLen);
-        uartSendBuf[jsonLen] = (char)(crc & 0xFFU);
-        uartSendBuf[jsonLen + 1U] = (char)((crc >> 8U) & 0xFFU);
-        uartSendBuf[jsonLen + 2U] = '\n';
-
-        HAL_UART_Transmit(&huart3, (uint8_t *)uartSendBuf, jsonLen + APP_PROTO_FRAME_TAIL_SIZE, HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart3, (uint8_t *)uartSendBuf, finnalDataLen, HAL_MAX_DELAY);
       }
       else
       {
         LOG_DEUBG("appUartTxTask -> Reply encode error");
       }
 
+      app_protocol_free_reply_msg(&replyMsg);
     }
   }
   /* USER CODE END appUartTxTask */
@@ -309,12 +307,6 @@ void appCmdHandleTask(void *argument)
         case APP_MSG_TYPE_ID_CMD_BRUSH_CONTROL:
           app_brush_control_handle(&cmdMsg, &replyMsg);
           break;
-        case APP_MSG_TYPE_ID_CMD_QUERY_STATUS:
-          app_query_status_handle(&cmdMsg, &replyMsg);
-          break;
-        case APP_MSG_TYPE_ID_CMD_QUERY_PRESSURE:
-          app_query_pressure_handle(&cmdMsg, &replyMsg);
-          break;
         default:
           // create_reply_msg(&cmdMsg, &replyMsg, cmdMsg.msg_type_id | 0x10U, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Unknown command");
           break;
@@ -324,6 +316,8 @@ void appCmdHandleTask(void *argument)
       {
         LOG_DEUBG("appCmdHandleTask -> Reply queue full");
       }
+
+      app_protocol_free_cmd_msg(&cmdMsg);
     }
   }
   /* USER CODE END appCmdHandleTask */
@@ -339,10 +333,59 @@ void appCmdHandleTask(void *argument)
 void appStatusTask(void *argument)
 {
   /* USER CODE BEGIN appStatusTask */
+  app_reply_msg_t pressureMsg;
+  app_reply_msg_t safetyEdgeMsg;
+  app_reply_msg_t deviceStatusMsg;
+
+  PressureSensor_Init();
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    // 1. 压力传感器
+    if(app_query_pressure_handle(&pressureMsg))
+    {
+      if (xQueueSend(replyQueue, &pressureMsg, 0U) != pdPASS)
+      {
+        LOG_DEUBG("appStatusTask -> Reply queue full");
+      }
+    }
+    else
+    {
+      LOG_DEUBG("appStatusTask -> Failed to create pressure reply message");
+    }
+
+    // 2. 安全触边  --  事件触发
+    bool edgeDetect = false;
+    if(app_query_safety_edge_handle(&safetyEdgeMsg, edgeDetect))
+    {
+      if (edgeDetect)
+      {
+        if(xQueueSend(replyQueue, &safetyEdgeMsg, 0U) != pdPASS)
+        {
+          LOG_DEUBG("appStatusTask -> Reply queue full");
+        }
+      }
+    }
+    else
+    {
+      LOG_DEUBG("appStatusTask -> Failed to create safety edge reply message");
+    }
+
+    // 3. 设备上报状态
+    if(app_query_device_status_handle(&deviceStatusMsg))
+    {
+      if (xQueueSend(replyQueue, &deviceStatusMsg, 0U) != pdPASS)
+      {
+        LOG_DEUBG("appStatusTask -> Reply queue full");
+      }
+    }
+    else
+    {
+      LOG_DEUBG("appStatusTask -> Failed to create device status reply message");
+    }
+
+    
+    osDelay(pdMS_TO_TICKS(10));
   }
   /* USER CODE END appStatusTask */
 }
@@ -367,5 +410,25 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     }
   }
 }
+
+bool app_msg_add_crc16_and_lf(uint8_t *buf, uint32_t bufSize, uint32_t* finnalLen)
+{
+  uint32_t msgLen = strlen((char *)buf);
+
+  if (!buf || bufSize < APP_PROTO_CRC16_SIZE || msgLen + APP_PROTO_FRAME_TAIL_SIZE > bufSize)
+    return false;
+
+  uint16_t crc = app_crc16_compute((const uint8_t *)buf, msgLen);
+  buf[msgLen] = (uint8_t)(crc & 0xFFU);
+  buf[msgLen + 1U] = (uint8_t)((crc >> 8U) & 0xFFU);
+  buf[msgLen + 2U] = '\n';
+
+  if (finnalLen != NULL)
+  {
+    *finnalLen = (uint32_t)(msgLen + APP_PROTO_FRAME_TAIL_SIZE);
+  }
+  return true;
+}
+
 /* USER CODE END Application */
 
