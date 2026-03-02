@@ -372,6 +372,7 @@ void appStatusTask(void *argument)
       {
         LOG_DEUBG("appStatusTask -> Reply queue full");
       }
+      LOG_DEUBG("appStatusTask -> Pressure status sent to queue");
     }
     else
     {
@@ -389,6 +390,7 @@ void appStatusTask(void *argument)
           LOG_DEUBG("appStatusTask -> Reply queue full");
         }
       }
+      LOG_DEUBG("appStatusTask -> Safety edge status sent to queue");
     }
     else
     {
@@ -402,6 +404,7 @@ void appStatusTask(void *argument)
       {
         LOG_DEUBG("appStatusTask -> Reply queue full");
       }
+      LOG_DEUBG("appStatusTask -> Device status sent to queue");
     }
     else
     {

@@ -14,11 +14,11 @@ extern "C" {
   do                                                                                 \
   {                                                                                  \
     char log_buf[128];                                                               \
-    int log_len = snprintf(log_buf, sizeof(log_buf), fmt "\r\n", ##__VA_ARGS__);  \
+    int log_len = snprintf(log_buf, sizeof(log_buf), fmt "\r\n", ##__VA_ARGS__);     \
     if (log_len > 0)                                                                 \
     {                                                                                \
       uint16_t tx_len = (uint16_t)((log_len < (int)sizeof(log_buf)) ? log_len : ((int)sizeof(log_buf) - 1)); \
-      (void)HAL_UART_Transmit(&huart3, (uint8_t *)log_buf, tx_len, HAL_MAX_DELAY); \
+      CDC_Transmit_FS((uint8_t *)log_buf, tx_len);                                   \
     }                                                                                \
   } while (0)
 
