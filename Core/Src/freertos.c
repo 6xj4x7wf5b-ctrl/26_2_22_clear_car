@@ -97,7 +97,7 @@ const osThreadAttr_t cmdHandleTask_attributes = {
 osThreadId_t statusTaskHandle;
 const osThreadAttr_t statusTask_attributes = {
   .name = "statusTask",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 
@@ -114,6 +114,25 @@ void appStatusTask(void *argument);
 
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+
+/* Hook prototypes */
+void vApplicationMallocFailedHook(void);
+
+/* USER CODE BEGIN 5 */
+void vApplicationMallocFailedHook(void)
+{
+   /* vApplicationMallocFailedHook() will only be called if
+   configUSE_MALLOC_FAILED_HOOK is set to 1 in FreeRTOSConfig.h. It is a hook
+   function that will get called if a call to pvPortMalloc() fails.
+   pvPortMalloc() is called internally by the kernel whenever a task, queue,
+   timer or semaphore is created. It is also called by various parts of the
+   demo application. If heap_1.c or heap_2.c are used, then the size of the
+   heap available to pvPortMalloc() is defined by configTOTAL_HEAP_SIZE in
+   FreeRTOSConfig.h, and the xPortGetFreeHeapSize() API function can be used
+   to query the size of free heap space that remains (although it does not
+   provide information on how the remaining heap might be fragmented). */
+}
+/* USER CODE END 5 */
 
 /**
   * @brief  FreeRTOS initialization
@@ -237,6 +256,8 @@ void appUartRxTask(void *argument)
       }
     }
   }
+
+  osDelay(pdMS_TO_TICKS(10));
   /* USER CODE END appUartRxTask */
 }
 
@@ -282,7 +303,7 @@ void appUartTxTask(void *argument)
     }
   }
 
-
+    osDelay(pdMS_TO_TICKS(10));
   /* USER CODE END appUartTxTask */
 }
 
@@ -343,6 +364,7 @@ void appCmdHandleTask(void *argument)
       app_protocol_free_cmd_msg(&cmdMsg);
       LOG_DEUBG("appCmdHandleTask -> Freed command message");
     }
+    osDelay(pdMS_TO_TICKS(10));
   }
   /* USER CODE END appCmdHandleTask */
 }

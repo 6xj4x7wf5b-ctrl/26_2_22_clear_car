@@ -20,7 +20,6 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "dma.h"
-#include "stm32f4xx_hal_conf.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
