@@ -18,7 +18,7 @@ extern "C" {
     if (log_len > 0)                                                                 \
     {                                                                                \
       uint16_t tx_len = (uint16_t)((log_len < (int)sizeof(log_buf)) ? log_len : ((int)sizeof(log_buf) - 1)); \
-      (void)CDC_Transmit_FS((uint8_t *)log_buf, tx_len);                            \
+      (void)HAL_UART_Transmit(&huart3, (uint8_t *)log_buf, tx_len, HAL_MAX_DELAY); \
     }                                                                                \
   } while (0)
 

@@ -43,10 +43,12 @@
 #include "proximity_switch.h"
 #include "usart.h"
 
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+extern DMA_HandleTypeDef hdma_usart3_rx;
 
 /* USER CODE END PTD */
 
@@ -182,6 +184,7 @@ void appUartRxTask(void *argument)
   uartRxTaskNotifyHandle = xTaskGetCurrentTaskHandle();
   
   HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uartRecvBuf, sizeof(uartRecvBuf) - 1U);
+  __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);  // 禁止半传输中断，避免干扰IDLE中断处理
   /* Infinite loop */
   for(;;)
   {
@@ -205,6 +208,7 @@ void appUartRxTask(void *argument)
           LOG_DEUBG("appUartRxTask -> Frame format error");
           continue;
         }
+        LOG_DEUBG("appUartRxTask -> Frame format OK");
         // 2. CRC16校验
         uint32_t jsonLen = notifyValue - APP_PROTO_FRAME_TAIL_SIZE;
         uint16_t recvCrc = (uint16_t)frameBuf[jsonLen]              // 获取接收到的CRC16值（小端排序）
@@ -215,6 +219,7 @@ void appUartRxTask(void *argument)
           LOG_DEUBG("appUartRxTask -> CRC error");
           continue;
         }
+        LOG_DEUBG("appUartRxTask -> CRC OK");
         // 3. 解析并发送到命令处理队列
         memset(&cmdMsg, 0, sizeof(cmdMsg));
         if(app_protocol_decode_cmd_msg((const char *)frameBuf, &cmdMsg) != 0)
@@ -222,11 +227,13 @@ void appUartRxTask(void *argument)
           LOG_DEUBG("appUartRxTask -> Decode error");
           continue;
         }
+        LOG_DEUBG("appUartRxTask -> Decode OK");
 
         if (xQueueSend(cmdQueue, &cmdMsg, 0U) != pdPASS)
         {
           LOG_DEUBG("appUartRxTask -> Cmd queue full");
         }
+          LOG_DEUBG("appUartRxTask -> Cmd sent to queue");
       }
     }
   }
@@ -251,16 +258,20 @@ void appUartTxTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    if (xQueueReceive(replyQueue, &replyMsg, 0U) == pdTRUE)
+    if (xQueueReceive(replyQueue, &replyMsg, portMAX_DELAY) == pdTRUE)
     {
+      LOG_DEUBG("appUartTxTask -> Received reply from queue");
       if (app_protocol_encode_reply_msg(&replyMsg, (char *)uartSendBuf, sizeof(uartSendBuf)) == 0)
       {
+        LOG_DEUBG("appUartTxTask -> Reply encode OK");
+
         if(!app_msg_add_crc16_and_lf(uartSendBuf, sizeof(uartSendBuf), &finnalDataLen))
         {
           LOG_DEUBG("appUartTxTask -> Failed to add CRC16 and LF");
           continue;
         }
         HAL_UART_Transmit(&huart3, (uint8_t *)uartSendBuf, finnalDataLen, HAL_MAX_DELAY);
+        LOG_DEUBG("appUartTxTask -> Sent: %s", uartSendBuf);
       }
       else
       {
@@ -270,6 +281,8 @@ void appUartTxTask(void *argument)
       app_protocol_free_reply_msg(&replyMsg);
     }
   }
+
+
   /* USER CODE END appUartTxTask */
 }
 
@@ -294,21 +307,27 @@ void appCmdHandleTask(void *argument)
       switch (cmdMsg.msg_type_id) {
         case APP_MSG_TYPE_ID_CMD_MOVE_LR:
           app_move_lr_handle(&cmdMsg, &replyMsg);
+          LOG_DEUBG("appCmdHandleTask -> Handled MOVE_LR command");
           break;
         case APP_MSG_TYPE_ID_CMD_MOVE_UD:
           app_move_ud_handle(&cmdMsg, &replyMsg);
+          LOG_DEUBG("appCmdHandleTask -> Handled MOVE_UD command");
           break;
         case APP_MSG_TYPE_ID_CMD_MOVE_XY:
           app_move_xy_handle(&cmdMsg, &replyMsg);
+          LOG_DEUBG("appCmdHandleTask -> Handled MOVE_XY command");
           break;
         case APP_MSG_TYPE_ID_CMD_TRACK_SWITCH:
           app_track_switch_handle(&cmdMsg, &replyMsg);
+          LOG_DEUBG("appCmdHandleTask -> Handled TRACK_SWITCH command");
           break;
         case APP_MSG_TYPE_ID_CMD_BALL_LOCK:
           app_ball_lock_handle(&cmdMsg, &replyMsg);
+          LOG_DEUBG("appCmdHandleTask -> Handled BALL_LOCK command");
           break;
         case APP_MSG_TYPE_ID_CMD_BRUSH_CONTROL:
           app_brush_control_handle(&cmdMsg, &replyMsg);
+          LOG_DEUBG("appCmdHandleTask -> Handled BRUSH_CONTROL command");
           break;
         default:
           // create_reply_msg(&cmdMsg, &replyMsg, cmdMsg.msg_type_id | 0x10U, "failed", APP_ERROR_CODE_INVALID_FORMAT, "Unknown command");
@@ -319,8 +338,10 @@ void appCmdHandleTask(void *argument)
       {
         LOG_DEUBG("appCmdHandleTask -> Reply queue full");
       }
+      LOG_DEUBG("appCmdHandleTask -> Reply sent to queue");
 
       app_protocol_free_cmd_msg(&cmdMsg);
+      LOG_DEUBG("appCmdHandleTask -> Freed command message");
     }
   }
   /* USER CODE END appCmdHandleTask */

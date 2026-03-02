@@ -20,6 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "dma.h"
+#include "stm32f4xx_hal_conf.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -33,6 +34,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "pressure_sensor.h"
+#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -108,7 +110,7 @@ int main(void)
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  PressureSensor_Init();
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
