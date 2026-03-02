@@ -13,7 +13,7 @@ extern "C" {
 #define LOG_DEUBG(fmt, ...)                                                          \
   do                                                                                 \
   {                                                                                  \
-    char log_buf[128];                                                               \
+    char log_buf[512];                                                               \
     int log_len = snprintf(log_buf, sizeof(log_buf), fmt "\r\n", ##__VA_ARGS__);     \
     if (log_len > 0)                                                                 \
     {                                                                                \
