@@ -569,12 +569,18 @@ bool app_query_pressure_handle(app_reply_msg_t *pressureMsg)
 
 
 
-bool app_query_safety_edge_handle(app_reply_msg_t *safetyEdgeMsg, bool detect)
+bool app_query_safety_edge_handle(app_reply_msg_t *safetyEdgeMsg, bool *detect)
 {
+    if ((safetyEdgeMsg == NULL) || (detect == NULL))
+    {
+        return false;
+    }
+
+    *detect = false;
+
     int edge_states = SafetyEdge_ReadAll();
     if(edge_states == 0x0F) // 0x0F表示四个边缘都未检测到
     {
-        detect = false;
         return true;
     }
 
@@ -594,7 +600,12 @@ bool app_query_safety_edge_handle(app_reply_msg_t *safetyEdgeMsg, bool detect)
 
     char level[16] = "none";
 
-    create_safety_edge_reply_msg(safetyEdgeMsg, collision_detected, position, level);
+    if (!create_safety_edge_reply_msg(safetyEdgeMsg, collision_detected, position, level))
+    {
+        return false;
+    }
+
+    *detect = collision_detected;
     return true;
 }
 

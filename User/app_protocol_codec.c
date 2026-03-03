@@ -1,11 +1,89 @@
 #include "app_protocol_codec.h"
 
-#include <string.h>
+#include "FreeRTOS.h"
+#include "task.h"
+#include "usb_device.h"
+#include "usbd_cdc.h"
 
-
+#include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 #include "cJSON.h"
+
+extern USBD_HandleTypeDef hUsbDeviceFS;
+
+static volatile uint8_t s_app_log_busy = 0U;
+static char s_app_log_buf[512];
+
+void app_log_debug(const char *fmt, ...)
+{
+    va_list args;
+    int log_len = 0;
+    uint16_t tx_len = 0U;
+    USBD_CDC_HandleTypeDef *hcdc = NULL;
+
+    if ((fmt == NULL) || (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED))
+    {
+        return;
+    }
+
+    for (;;)
+    {
+        taskENTER_CRITICAL();
+        if (s_app_log_busy == 0U)
+        {
+            s_app_log_busy = 1U;
+            taskEXIT_CRITICAL();
+            break;
+        }
+        taskEXIT_CRITICAL();
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+    va_start(args, fmt);
+    log_len = vsnprintf(s_app_log_buf, sizeof(s_app_log_buf) - 3U, fmt, args);
+    va_end(args);
+
+    if (log_len <= 0)
+    {
+        goto cleanup;
+    }
+
+    if ((size_t)log_len > (sizeof(s_app_log_buf) - 3U))
+    {
+        log_len = (int)(sizeof(s_app_log_buf) - 3U);
+    }
+
+    s_app_log_buf[log_len++] = '\r';
+    s_app_log_buf[log_len++] = '\n';
+    s_app_log_buf[log_len] = '\0';
+
+    if ((hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED) || (hUsbDeviceFS.pClassData == NULL))
+    {
+        goto cleanup;
+    }
+
+    tx_len = (uint16_t)((log_len < (int)sizeof(s_app_log_buf)) ? log_len : ((int)sizeof(s_app_log_buf) - 1));
+    while (CDC_Transmit_FS((uint8_t *)s_app_log_buf, tx_len) == USBD_BUSY)
+    {
+        if ((hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED) || (hUsbDeviceFS.pClassData == NULL))
+        {
+            goto cleanup;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+    hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
+    while ((hcdc != NULL) && (hcdc->TxState != 0U))
+    {
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+cleanup:
+    taskENTER_CRITICAL();
+    s_app_log_busy = 0U;
+    taskEXIT_CRITICAL();
+}
 
 int app_protocol_decode_cmd_msg(const char *json_str, app_cmd_msg_t *out_msg)
 {

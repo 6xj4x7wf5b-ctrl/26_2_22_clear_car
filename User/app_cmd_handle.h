@@ -21,7 +21,7 @@ bool app_brush_control_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *repl
 
 // 主动上报命令
 bool app_query_pressure_handle(app_reply_msg_t *pressureMsg);
-bool app_query_safety_edge_handle(app_reply_msg_t *safetyEdgeMsg, bool detect);
+bool app_query_safety_edge_handle(app_reply_msg_t *safetyEdgeMsg, bool *detect);
 bool app_query_device_status_handle(app_reply_msg_t *deviceStatusMsg);
 
 

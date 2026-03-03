@@ -10,17 +10,9 @@
 extern "C" {
 #endif
 
-#define LOG_DEUBG(fmt, ...)                                                          \
-  do                                                                                 \
-  {                                                                                  \
-    char log_buf[512];                                                               \
-    int log_len = snprintf(log_buf, sizeof(log_buf), fmt "\r\n", ##__VA_ARGS__);     \
-    if (log_len > 0)                                                                 \
-    {                                                                                \
-      uint16_t tx_len = (uint16_t)((log_len < (int)sizeof(log_buf)) ? log_len : ((int)sizeof(log_buf) - 1)); \
-      CDC_Transmit_FS((uint8_t *)log_buf, tx_len);                                   \
-    }                                                                                \
-  } while (0)
+void app_log_debug(const char *fmt, ...);
+
+#define LOG_DEUBG(...) app_log_debug(__VA_ARGS__)
 
 #define APP_MSG_TYPE_STR_LEN   8U
 #define APP_MSG_NAME_STR_LEN   32U
