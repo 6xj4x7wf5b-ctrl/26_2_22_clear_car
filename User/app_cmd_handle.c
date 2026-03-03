@@ -239,7 +239,7 @@ bool create_device_status_reply_msg(app_reply_msg_t *deviceStatusMsg)
         return false;
 
     memset(deviceStatusMsg, 0, sizeof(app_reply_msg_t));
-    deviceStatusMsg->msg_type_id = 0x34;  // ACK类型
+    deviceStatusMsg->msg_type_id = APP_MSG_TYPE_ID_REPORT_DEVICE_STAT;
     deviceStatusMsg->msg_seq = app_msg_id_seq++;
     (void)snprintf(deviceStatusMsg->msg_type, APP_MSG_TYPE_STR_LEN, "%s", "report");
     (void)snprintf(deviceStatusMsg->msg_name, APP_MSG_NAME_STR_LEN, "%s", "device_status");
@@ -271,6 +271,7 @@ bool create_device_status_reply_msg(app_reply_msg_t *deviceStatusMsg)
         goto error;
     if(!cJSON_AddItemToObject(data_json, "motion_status", motion_status))
         goto error;
+    motion_status = NULL;
 
     power_status = cJSON_CreateObject();
     if (!power_status)
@@ -285,6 +286,7 @@ bool create_device_status_reply_msg(app_reply_msg_t *deviceStatusMsg)
         goto error;
     if(!cJSON_AddItemToObject(data_json, "power_status", power_status))
         goto error;
+    power_status = NULL;
 
     if(!cJSON_AddStringToObject(data_json, "track_mode", app_device_status.track_mode))
         goto error;
@@ -302,6 +304,7 @@ bool create_device_status_reply_msg(app_reply_msg_t *deviceStatusMsg)
         goto error;
     if(!cJSON_AddItemToObject(data_json, "brush_status", brush_status))
         goto error;
+    brush_status = NULL;
 
     system_status = cJSON_CreateObject();
     if (!system_status)
@@ -314,6 +317,7 @@ bool create_device_status_reply_msg(app_reply_msg_t *deviceStatusMsg)
         goto error;
     if(!cJSON_AddItemToObject(data_json, "system_status", system_status))
         goto error;
+    system_status = NULL;
 
     deviceStatusMsg->data_json = data_json;
     return true;
@@ -560,11 +564,9 @@ bool app_query_pressure_handle(app_reply_msg_t *pressureMsg)
     PressureSensor_Status status = PressureSensor_ReadWeight(&weight);
     if (status != PRESSURE_SENSOR_STATUS_OK)
     {
-        create_pressure_reply_msg(pressureMsg, 0.0f, false);
-        return false;
+        return create_pressure_reply_msg(pressureMsg, 0.0f, false);
     }
-    create_pressure_reply_msg(pressureMsg, (float)weight, status == PRESSURE_SENSOR_STATUS_OK);
-    return true;
+    return create_pressure_reply_msg(pressureMsg, (float)weight, true);
 }
 
 

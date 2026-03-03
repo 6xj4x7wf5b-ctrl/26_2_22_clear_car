@@ -215,7 +215,7 @@ void appUartRxTask(void *argument)
       memcpy(frameBuf, uartRecvBuf, notifyValue);
       frameBuf[notifyValue] = '\0';
 
-      LOG_DEUBG("appUartRxTask -> recv: %s", frameBuf);
+      app_log_debug("appUartRxTask -> recv: %s", frameBuf);
 
       // 2. 重新启动DMA接收
       HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uartRecvBuf, sizeof(uartRecvBuf) - 1U);
@@ -226,10 +226,10 @@ void appUartRxTask(void *argument)
         // 1. 帧格式初步校验：至少要有CRC16和帧尾\n
         if ((notifyValue <= APP_PROTO_FRAME_TAIL_SIZE) || (frameBuf[notifyValue - 1U] != (uint8_t)'\n'))
         {
-          LOG_DEUBG("appUartRxTask -> Frame format error");
+          app_log_debug("appUartRxTask -> Frame format error");
           continue;
         }
-        LOG_DEUBG("appUartRxTask -> Frame format OK");
+        app_log_debug("appUartRxTask -> Frame format OK");
         // 2. CRC16校验
         uint32_t jsonLen = notifyValue - APP_PROTO_FRAME_TAIL_SIZE;
         uint16_t recvCrc = (uint16_t)frameBuf[jsonLen]              // 获取接收到的CRC16值（小端排序）
@@ -237,22 +237,22 @@ void appUartRxTask(void *argument)
         uint16_t calcCrc = app_crc16_compute(frameBuf, (size_t)jsonLen);
         if (recvCrc != calcCrc)
         {
-          LOG_DEUBG("appUartRxTask -> CRC error");
+          app_log_debug("appUartRxTask -> CRC error");
           continue;
         }
-        LOG_DEUBG("appUartRxTask -> CRC OK");
+        app_log_debug("appUartRxTask -> CRC OK");
         // 3. 解析并发送到命令处理队列
         memset(&cmdMsg, 0, sizeof(cmdMsg));
         if(app_protocol_decode_cmd_msg((const char *)frameBuf, &cmdMsg) != 0)
         {
-          LOG_DEUBG("appUartRxTask -> Decode error");
+          app_log_debug("appUartRxTask -> Decode error");
           continue;
         }
-        LOG_DEUBG("appUartRxTask -> Decode OK");
+        app_log_debug("appUartRxTask -> Decode OK");
 
         if (app_cmd_msg_send_to_queue(&cmdMsg))
         {
-          LOG_DEUBG("appUartRxTask -> Cmd sent to queue");
+          app_log_debug("appUartRxTask -> Cmd sent to queue");
         }
       }
     }
@@ -282,25 +282,28 @@ void appUartTxTask(void *argument)
   {
     if (xQueueReceive(replyQueue, &replyMsg, portMAX_DELAY) == pdTRUE)
     {
-      LOG_DEUBG("appUartTxTask -> Received reply from queue");
+      app_log_debug("appUartTxTask -> Received reply from queue");
       if (app_protocol_encode_reply_msg(&replyMsg, (char *)uartSendBuf, sizeof(uartSendBuf)) == 0)
       {
-        LOG_DEUBG("appUartTxTask -> Reply encode OK");
+        app_log_debug("appUartTxTask -> Reply encode OK");
 
         if(!app_msg_add_crc16_and_lf(uartSendBuf, sizeof(uartSendBuf), &finnalDataLen))
         {
-          LOG_DEUBG("appUartTxTask -> Failed to add CRC16 and LF");
+          app_log_debug("appUartTxTask -> Failed to add CRC16 and LF");
+          app_protocol_free_reply_msg(&replyMsg);
+          memset(&replyMsg, 0, sizeof(replyMsg));
           continue;
         }
         HAL_UART_Transmit(&huart3, (uint8_t *)uartSendBuf, finnalDataLen, HAL_MAX_DELAY);
-        LOG_DEUBG("appUartTxTask -> Sent: %s", uartSendBuf);
+        app_log_debug("appUartTxTask -> Sent %lu bytes", (unsigned long)finnalDataLen);
       }
       else
       {
-        LOG_DEUBG("appUartTxTask -> Reply encode error");
+        app_log_debug("appUartTxTask -> Reply encode error");
       }
 
       app_protocol_free_reply_msg(&replyMsg);
+      memset(&replyMsg, 0, sizeof(replyMsg));
     }
   }
 
@@ -333,35 +336,35 @@ void appCmdHandleTask(void *argument)
       switch (cmdMsg.msg_type_id) {
         case APP_MSG_TYPE_ID_CMD_MOVE_LR:
           replyReady = app_move_lr_handle(&cmdMsg, &replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled MOVE_LR command");
+          app_log_debug("appCmdHandleTask -> Handled MOVE_LR command");
           break;
         case APP_MSG_TYPE_ID_CMD_MOVE_UD:
           replyReady = app_move_ud_handle(&cmdMsg, &replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled MOVE_UD command");
+          app_log_debug("appCmdHandleTask -> Handled MOVE_UD command");
           break;
         case APP_MSG_TYPE_ID_CMD_MOVE_XY:
           replyReady = app_move_xy_handle(&cmdMsg, &replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled MOVE_XY command");
+          app_log_debug("appCmdHandleTask -> Handled MOVE_XY command");
           break;
         case APP_MSG_TYPE_ID_CMD_TRACK_SWITCH:
           replyReady = app_track_switch_handle(&cmdMsg, &replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled TRACK_SWITCH command");
+          app_log_debug("appCmdHandleTask -> Handled TRACK_SWITCH command");
           break;
         case APP_MSG_TYPE_ID_CMD_BALL_LOCK:
           replyReady = app_ball_lock_handle(&cmdMsg, &replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled BALL_LOCK command");
+          app_log_debug("appCmdHandleTask -> Handled BALL_LOCK command");
           break;
         case APP_MSG_TYPE_ID_CMD_BRUSH_CONTROL:
           replyReady = app_brush_control_handle(&cmdMsg, &replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled BRUSH_CONTROL command");
+          app_log_debug("appCmdHandleTask -> Handled BRUSH_CONTROL command");
           break;
         case APP_MSG_TYPE_ID_CMD_QUERY_STATUS:
           replyReady = app_query_device_status_handle(&replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled QUERY_STATUS command");
+          app_log_debug("appCmdHandleTask -> Handled QUERY_STATUS command");
           break;
         case APP_MSG_TYPE_ID_CMD_QUERY_PRESSURE:
           replyReady = app_query_pressure_handle(&replyMsg) || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Handled QUERY_PRESSURE command");
+          app_log_debug("appCmdHandleTask -> Handled QUERY_PRESSURE command");
           break;
         default:
           replyReady = create_cmd_reply_msg(&cmdMsg,
@@ -371,18 +374,18 @@ void appCmdHandleTask(void *argument)
                                             APP_ERROR_CODE_INVALID_FORMAT,
                                             "Unknown command");
           replyReady = replyReady || (replyMsg.data_json != NULL);
-          LOG_DEUBG("appCmdHandleTask -> Unknown command: %lu", (unsigned long)cmdMsg.msg_type_id);
+          app_log_debug("appCmdHandleTask -> Unknown command: %lu", (unsigned long)cmdMsg.msg_type_id);
           break;
       }
 
       if (replyReady && app_reply_msg_send_to_queue(&replyMsg, "appCmdHandleTask"))
       {
-        LOG_DEUBG("appCmdHandleTask -> Reply sent to queue");
+        app_log_debug("appCmdHandleTask -> Reply sent to queue");
       }
 
       app_protocol_free_cmd_msg(&cmdMsg);
       memset(&cmdMsg, 0, sizeof(cmdMsg));
-      LOG_DEUBG("appCmdHandleTask -> Freed command message");
+      app_log_debug("appCmdHandleTask -> Freed command message");
     }
     osDelay(pdMS_TO_TICKS(10));
   }
@@ -413,12 +416,12 @@ void appStatusTask(void *argument)
     {
       if (app_reply_msg_send_to_queue(&pressureMsg, "appStatusTask"))
       {
-        LOG_DEUBG("appStatusTask -> Pressure status sent to queue");
+        app_log_debug("appStatusTask -> Pressure status sent to queue");
       }
     }
     else
     {
-      LOG_DEUBG("appStatusTask -> Failed to create pressure reply message");
+      app_log_debug("appStatusTask -> Failed to create pressure reply message");
     }
 
     // 2. 安全触边  --  事件触发
@@ -430,13 +433,13 @@ void appStatusTask(void *argument)
       {
         if(app_reply_msg_send_to_queue(&safetyEdgeMsg, "appStatusTask"))
         {
-          LOG_DEUBG("appStatusTask -> Safety edge status sent to queue");
+          app_log_debug("appStatusTask -> Safety edge status sent to queue");
         }
       }
     }
     else
     {
-      LOG_DEUBG("appStatusTask -> Failed to create safety edge reply message");
+      app_log_debug("appStatusTask -> Failed to create safety edge reply message");
     }
 
     // 3. 设备上报状态
@@ -445,12 +448,12 @@ void appStatusTask(void *argument)
     {
       if (app_reply_msg_send_to_queue(&deviceStatusMsg, "appStatusTask"))
       {
-        LOG_DEUBG("appStatusTask -> Device status sent to queue");
+        app_log_debug("appStatusTask -> Device status sent to queue");
       }
     }
     else
     {
-      LOG_DEUBG("appStatusTask -> Failed to create device status reply message");
+      app_log_debug("appStatusTask -> Failed to create device status reply message");
     }
 
     
@@ -504,7 +507,7 @@ static bool app_cmd_msg_send_to_queue(app_cmd_msg_t *cmdMsg)
 {
   if (xQueueSend(cmdQueue, cmdMsg, 0U) != pdPASS)
   {
-    LOG_DEUBG("appUartRxTask -> Cmd queue full");
+    app_log_debug("appUartRxTask -> Cmd queue full");
     app_protocol_free_cmd_msg(cmdMsg);
     memset(cmdMsg, 0, sizeof(*cmdMsg));
     return false;
@@ -518,7 +521,7 @@ static bool app_reply_msg_send_to_queue(app_reply_msg_t *replyMsg, const char *o
 {
   if (xQueueSend(replyQueue, replyMsg, 0U) != pdPASS)
   {
-    LOG_DEUBG("%s -> Reply queue full", owner);
+    app_log_debug("%s -> Reply queue full", owner);
     app_protocol_free_reply_msg(replyMsg);
     memset(replyMsg, 0, sizeof(*replyMsg));
     return false;

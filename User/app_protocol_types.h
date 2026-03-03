@@ -12,8 +12,6 @@ extern "C" {
 
 void app_log_debug(const char *fmt, ...);
 
-#define LOG_DEUBG(...) app_log_debug(__VA_ARGS__)
-
 #define APP_MSG_TYPE_STR_LEN   8U
 #define APP_MSG_NAME_STR_LEN   32U
 #define APP_MSG_DATA_JSON_LEN  192U
