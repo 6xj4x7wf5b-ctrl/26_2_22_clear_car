@@ -12,6 +12,7 @@
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
+#if APP_LOG_ENABLED
 static volatile uint8_t s_app_log_busy = 0U;
 static char s_app_log_buf[512];
 
@@ -84,6 +85,7 @@ cleanup:
     s_app_log_busy = 0U;
     taskEXIT_CRITICAL();
 }
+#endif
 
 int app_protocol_decode_cmd_msg(const char *json_str, app_cmd_msg_t *out_msg)
 {

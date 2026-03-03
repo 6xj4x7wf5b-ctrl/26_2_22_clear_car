@@ -10,7 +10,13 @@
 extern "C" {
 #endif
 
+#define APP_LOG_ENABLED 1U
+
+#if APP_LOG_ENABLED
 void app_log_debug(const char *fmt, ...);
+#else
+#define app_log_debug(...) ((void)0)
+#endif
 
 #define APP_MSG_TYPE_STR_LEN   8U
 #define APP_MSG_NAME_STR_LEN   32U

@@ -457,7 +457,7 @@ void appStatusTask(void *argument)
     }
 
     
-    osDelay(pdMS_TO_TICKS(10));
+    osDelay(pdMS_TO_TICKS(1000));
   }
   /* USER CODE END appStatusTask */
 }
