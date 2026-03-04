@@ -40,6 +40,8 @@ static MotorHandle motor_crawler_right = {
 
 bool Motor_ChassisMoveUp(float speed)
 {
+	speed = 1.0f - speed;
+
 	uint32_t ccr_left = Motor_SpeedToCcr(&motor_crawler_left, speed);
 	uint32_t ccr_right = Motor_SpeedToCcr(&motor_crawler_right, speed);
 
@@ -56,6 +58,8 @@ bool Motor_ChassisMoveUp(float speed)
 
 bool Motor_ChassisMoveDown(float speed)
 {
+	speed = 1.0f - speed;
+
 	uint32_t ccr_left = Motor_SpeedToCcr(&motor_crawler_left, speed);
 	uint32_t ccr_right = Motor_SpeedToCcr(&motor_crawler_right, speed);
 
@@ -72,10 +76,12 @@ bool Motor_ChassisMoveDown(float speed)
 
 bool Motor_ChassisMoveLeft(float speed)
 {
+	speed = 1.0f - speed;
+
 	uint32_t ccr_up = Motor_SpeedToCcr(&motor_crawler_up, speed);
 	uint32_t ccr_down = Motor_SpeedToCcr(&motor_crawler_down, speed);
 
-	bool ok_up = Motor_SetDir(&motor_crawler_up, MOTOR_DIR_CW);
+	bool ok_up = Motor_SetDir(&motor_crawler_up, MOTOR_DIR_CCW);
 	bool ok_down = Motor_SetDir(&motor_crawler_down, MOTOR_DIR_CW);
 
 	ok_up = Motor_SetCCR(&motor_crawler_up, ccr_up);
@@ -88,10 +94,12 @@ bool Motor_ChassisMoveLeft(float speed)
 
 bool Motor_ChassisMoveRight(float speed)
 {
+	speed = 1.0f - speed;
+
 	uint32_t ccr_up = Motor_SpeedToCcr(&motor_crawler_up, speed);
 	uint32_t ccr_down = Motor_SpeedToCcr(&motor_crawler_down, speed);
 
-	bool ok_up = Motor_SetDir(&motor_crawler_up, MOTOR_DIR_CCW);
+	bool ok_up = Motor_SetDir(&motor_crawler_up, MOTOR_DIR_CW);
 	bool ok_down = Motor_SetDir(&motor_crawler_down, MOTOR_DIR_CCW);
 
 	ok_up = Motor_SetCCR(&motor_crawler_up, ccr_up);

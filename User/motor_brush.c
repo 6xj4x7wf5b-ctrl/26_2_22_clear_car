@@ -28,7 +28,7 @@ static float speed_scale(float speed)
     if (speed < 0.0) speed = 0.0;
     if (speed > 1.0) speed = 1.0;
 
-    return 0.097 - 0.042 * speed;
+    return 0.055 + 0.042 * speed;
 }
 
 bool Motor_BrushStart(float speed)
@@ -49,9 +49,10 @@ bool Motor_BrushStart(float speed)
 
 bool Motor_BrushStop(void)
 {
-	bool ok_left = Motor_Stop(&motor_brush_left);
-	bool ok_right = Motor_Stop(&motor_brush_right);
+	// bool ok_left = Motor_Stop(&motor_brush_left);
+	// bool ok_right = Motor_Stop(&motor_brush_right);
+	bool ok = Motor_BrushStart(0.0f);
 
-	return (ok_left && ok_right);
+	return ok;
 }
 

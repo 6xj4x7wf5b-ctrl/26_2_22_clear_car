@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include "pressure_sensor.h"
 #include "usbd_cdc_if.h"
+#include "motor_brush.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -108,7 +109,7 @@ int main(void)
   MX_UART4_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  Motor_BrushStart(0.0f);
 
   /* USER CODE END 2 */
 
