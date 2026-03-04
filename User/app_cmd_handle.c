@@ -588,13 +588,13 @@ bool app_query_safety_edge_handle(app_reply_msg_t *safetyEdgeMsg, bool *detect)
 
     bool collision_detected = edge_states != 0;
     char position[16]; 
-    if(edge_states & 0x01) {
+    if((edge_states & 0x01) == 0) {
         snprintf(position, sizeof(position), "front");
-    } else if(edge_states & 0x02) {
+    } else if((edge_states & 0x02) == 0) {
         snprintf(position, sizeof(position), "rear");
-    } else if(edge_states & 0x04) {
+    } else if((edge_states & 0x04) == 0) {
         snprintf(position, sizeof(position), "left");
-    } else if(edge_states & 0x08) {
+    } else if((edge_states & 0x08) == 0) {
         snprintf(position, sizeof(position), "right");
     } else {
         snprintf(position, sizeof(position), "none");
