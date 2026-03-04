@@ -532,3 +532,4 @@ static bool app_reply_msg_send_to_queue(app_reply_msg_t *replyMsg, const char *o
 }
 
 /* USER CODE END Application */
+
