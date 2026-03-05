@@ -73,10 +73,10 @@ void Error_Handler(void);
 #define BOUNDARY_3_GPIO_Port GPIOE
 #define BOUNDARY_4_Pin GPIO_PIN_14
 #define BOUNDARY_4_GPIO_Port GPIOE
-#define TIM4_CH1_DIR_Pin GPIO_PIN_10
-#define TIM4_CH1_DIR_GPIO_Port GPIOD
-#define TIM4_CH1_EN_Pin GPIO_PIN_11
+#define TIM4_CH1_EN_Pin GPIO_PIN_10
 #define TIM4_CH1_EN_GPIO_Port GPIOD
+#define TIM4_CH1_DIR_Pin GPIO_PIN_11
+#define TIM4_CH1_DIR_GPIO_Port GPIOD
 #define TIM3_CH1_EN_Pin GPIO_PIN_5
 #define TIM3_CH1_EN_GPIO_Port GPIOB
 #define TIM3_CH1_DIR_Pin GPIO_PIN_6

@@ -57,7 +57,7 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, TIM2_CH1_DIR_Pin|TIM2_CH2_DIR_Pin|TIM2_CH3_DIR_Pin|TIM2_CH4_DIR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, TIM4_CH1_DIR_Pin|TIM4_CH1_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, TIM4_CH1_EN_Pin|TIM4_CH1_DIR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, TIM3_CH1_EN_Pin|TIM3_CH1_DIR_Pin, GPIO_PIN_RESET);
@@ -75,8 +75,8 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TIM4_CH1_DIR_Pin TIM4_CH1_EN_Pin */
-  GPIO_InitStruct.Pin = TIM4_CH1_DIR_Pin|TIM4_CH1_EN_Pin;
+  /*Configure GPIO pins : TIM4_CH1_EN_Pin TIM4_CH1_DIR_Pin */
+  GPIO_InitStruct.Pin = TIM4_CH1_EN_Pin|TIM4_CH1_DIR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
