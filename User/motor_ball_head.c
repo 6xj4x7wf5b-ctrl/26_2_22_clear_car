@@ -14,12 +14,12 @@
 #define MOTOR_BALL_HEAD_PROXIMITY_SWITCH_INDEX   1	
 
 static MotorHandle motor_ball_head_lock = {
-	.htim = &htim3,
+	.htim = &htim4,
 	.channel = TIM_CHANNEL_1,
-	.dir_port = TIM3_CH1_DIR_GPIO_Port,		// GPIOB
-	.dir_pin = TIM3_CH1_DIR_Pin,			// GPIO_PIN_6
-	.en_port = TIM3_CH1_EN_GPIO_Port,		// GPIOB
-	.en_pin = TIM3_CH1_EN_Pin				// GPIO_PIN_5
+	.dir_port = TIM4_CH1_DIR_GPIO_Port,		// GPIOB
+	.dir_pin = TIM4_CH1_DIR_Pin,			// GPIO_PIN_6
+	.en_port = TIM4_CH1_EN_GPIO_Port,		// GPIOB
+	.en_pin = TIM4_CH1_EN_Pin				// GPIO_PIN_5
 };
 
 

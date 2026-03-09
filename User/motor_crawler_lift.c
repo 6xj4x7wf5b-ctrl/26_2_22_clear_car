@@ -14,12 +14,12 @@
 #define MOTOR_CRAWLER_LIFT_PROXIMITY_SWITCH_INDEX   1	
 
 static MotorHandle motor_crawler_lift = {
-	.htim = &htim4,
+	.htim = &htim3,
 	.channel = TIM_CHANNEL_1,
-	.dir_port = TIM4_CH1_DIR_GPIO_Port,
-	.dir_pin = TIM4_CH1_DIR_Pin,
-	.en_port = TIM4_CH1_EN_GPIO_Port,
-	.en_pin = TIM4_CH1_EN_Pin
+	.dir_port = TIM3_CH1_DIR_GPIO_Port,
+	.dir_pin = TIM3_CH1_DIR_Pin,
+	.en_port = TIM3_CH1_EN_GPIO_Port,
+	.en_pin = TIM3_CH1_EN_Pin
 };
 
 bool Motor_CrawlerLiftUp()
