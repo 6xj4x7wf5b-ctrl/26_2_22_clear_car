@@ -26,7 +26,7 @@ bool Motor_CrawlerLiftUp()
 {
 	Motor_SetDir(&motor_crawler_lift, MOTOR_DIR_CW);
 
-	Motor_Run(&motor_crawler_lift);
+	Motor_Run_With_Reset_Enable(&motor_crawler_lift);
 	osDelay(pdMS_TO_TICKS(2000));	
 	Motor_Stop(&motor_crawler_lift);
 
@@ -41,7 +41,7 @@ bool Motor_CrawlerLiftDown()
 {
 	Motor_SetDir(&motor_crawler_lift, MOTOR_DIR_CCW);
 
-	Motor_Run(&motor_crawler_lift);
+	Motor_Run_With_Reset_Enable(&motor_crawler_lift);
 	osDelay(pdMS_TO_TICKS(2000));	
 	Motor_Stop(&motor_crawler_lift);
 

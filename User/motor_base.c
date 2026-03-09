@@ -91,6 +91,28 @@ bool Motor_Run(MotorHandle *motor)
 	return (HAL_TIM_PWM_Start(motor->htim, motor->channel) == HAL_OK);
 }
 
+bool Motor_Run_With_Reset_Enable(MotorHandle *motor)
+{
+	if (motor == NULL || motor->htim == NULL)
+	{
+		return false;
+	}
+
+	if (!Motor_SetEnable(motor, 0u))
+	{
+		return false;
+	}
+
+	HAL_Delay(10);  // 确保使能信号被拉低一段时间
+
+	if (!Motor_SetEnable(motor, 1u))
+	{
+		return false;
+	}
+
+	return (HAL_TIM_PWM_Start(motor->htim, motor->channel) == HAL_OK);
+}
+
 bool Motor_Stop(MotorHandle *motor)
 {
 	HAL_StatusTypeDef hal_ret = HAL_OK;

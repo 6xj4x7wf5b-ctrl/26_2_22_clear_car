@@ -23,6 +23,8 @@ typedef struct
 bool Motor_Run(MotorHandle *motor);
 bool Motor_Stop(MotorHandle *motor);
 
+bool Motor_Run_With_Reset_Enable(MotorHandle *motor);		// 用于低电平使能
+
 bool Motor_SetDir(MotorHandle *motor, MotorDir dir);
 bool Motor_SetEnable(MotorHandle *motor, uint8_t enable);
 

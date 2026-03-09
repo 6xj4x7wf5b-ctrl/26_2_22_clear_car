@@ -28,7 +28,7 @@ bool Motor_BallHeadLock()
 {	
 	Motor_SetDir(&motor_ball_head_lock, MOTOR_DIR_CW);
 
-	Motor_Run(&motor_ball_head_lock);
+	Motor_Run_With_Reset_Enable(&motor_ball_head_lock);
 	osDelay(pdMS_TO_TICKS(2000));	
 	Motor_Stop(&motor_ball_head_lock);
 
@@ -43,7 +43,7 @@ bool Motor_BallHeadUnlock()
 {
 	Motor_SetDir(&motor_ball_head_lock, MOTOR_DIR_CCW);
 
-	Motor_Run(&motor_ball_head_lock);
+	Motor_Run_With_Reset_Enable(&motor_ball_head_lock);
 	osDelay(pdMS_TO_TICKS(2000));	
 	Motor_Stop(&motor_ball_head_lock);
 
