@@ -104,6 +104,13 @@ const osThreadAttr_t statusTask_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for sensorUploadTas */
+osThreadId_t sensorUploadTasHandle;
+const osThreadAttr_t sensorUploadTas_attributes = {
+  .name = "sensorUploadTas",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -117,6 +124,7 @@ void appUartRxTask(void *argument);
 void appUartTxTask(void *argument);
 void appCmdHandleTask(void *argument);
 void appStatusTask(void *argument);
+void appSensorUploadTask(void *argument);
 
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -178,6 +186,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of statusTask */
   statusTaskHandle = osThreadNew(appStatusTask, NULL, &statusTask_attributes);
+
+  /* creation of sensorUploadTas */
+  sensorUploadTasHandle = osThreadNew(appSensorUploadTask, NULL, &sensorUploadTas_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -406,11 +417,6 @@ void appCmdHandleTask(void *argument)
 void appStatusTask(void *argument)
 {
   /* USER CODE BEGIN appStatusTask */
-  app_reply_msg_t imuMsg;
-  app_reply_msg_t pressureMsg;
-  app_reply_msg_t safetyEdgeMsg;
-  app_reply_msg_t deviceStatusMsg;
-
   PressureSensor_Init();
   IMU_JY901S_Init();
 
@@ -420,8 +426,30 @@ void appStatusTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    (void)IMU_JY901S_Process();
+    IMU_JY901S_Process();
+    osDelay(1);
+  }
+  /* USER CODE END appStatusTask */
+}
 
+/* USER CODE BEGIN Header_appSensorUploadTask */
+/**
+* @brief Function implementing the sensorUploadTas thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_appSensorUploadTask */
+void appSensorUploadTask(void *argument)
+{
+  /* USER CODE BEGIN appSensorUploadTask */
+  app_reply_msg_t imuMsg;
+  app_reply_msg_t pressureMsg;
+  app_reply_msg_t safetyEdgeMsg;
+  app_reply_msg_t deviceStatusMsg;
+
+  /* Infinite loop */
+  for(;;)
+  {
     // 1. IMU
     memset(&imuMsg, 0, sizeof(imuMsg));
     if(app_query_imu_handle(&imuMsg))
@@ -485,7 +513,7 @@ void appStatusTask(void *argument)
     
     osDelay(pdMS_TO_TICKS(100));
   }
-  /* USER CODE END appStatusTask */
+  /* USER CODE END appSensorUploadTask */
 }
 
 /* Private application code --------------------------------------------------*/
