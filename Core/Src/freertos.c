@@ -42,12 +42,14 @@
 #include "safety_edge.h"
 #include "proximity_switch.h"
 #include "usart.h"
+#include "imu_jy901s.h"
 
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+extern DMA_HandleTypeDef hdma_usart1_rx;
 extern DMA_HandleTypeDef hdma_usart3_rx;
 
 /* USER CODE END PTD */
@@ -70,6 +72,8 @@ static QueueHandle_t cmdQueue;
 static QueueHandle_t replyQueue;
 
 static TaskHandle_t uartRxTaskNotifyHandle;
+
+static uint8_t g_imuRxBuffer[128];
 
 /* USER CODE END Variables */
 /* Definitions for uartRxTask */
@@ -402,62 +406,84 @@ void appCmdHandleTask(void *argument)
 void appStatusTask(void *argument)
 {
   /* USER CODE BEGIN appStatusTask */
+  app_reply_msg_t imuMsg;
   app_reply_msg_t pressureMsg;
   app_reply_msg_t safetyEdgeMsg;
   app_reply_msg_t deviceStatusMsg;
 
   PressureSensor_Init();
+  IMU_JY901S_Init();
+
+
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, g_imuRxBuffer, sizeof(g_imuRxBuffer) - 1U);
+  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);  // 禁止半传输中断，避免干扰IDLE中断处理
   /* Infinite loop */
   for(;;)
   {
-    // 1. 压力传感器
-    memset(&pressureMsg, 0, sizeof(pressureMsg));
-    if(app_query_pressure_handle(&pressureMsg))
+    (void)IMU_JY901S_Process();
+
+    // 1. IMU
+    memset(&imuMsg, 0, sizeof(imuMsg));
+    if(app_query_imu_handle(&imuMsg))
     {
-      if (app_reply_msg_send_to_queue(&pressureMsg, "appStatusTask"))
+      if (app_reply_msg_send_to_queue(&imuMsg, "appStatusTask"))
       {
-        app_log_debug("appStatusTask -> Pressure status sent to queue");
+        app_log_debug("appStatusTask -> IMU status sent to queue");
       }
     }
     else
     {
-      app_log_debug("appStatusTask -> Failed to create pressure reply message");
+      app_log_debug("appStatusTask -> Failed to create IMU reply message");
     }
 
-    // 2. 安全触边  --  事件触发
-    bool edgeDetect = false;
-    memset(&safetyEdgeMsg, 0, sizeof(safetyEdgeMsg));
-    if(app_query_safety_edge_handle(&safetyEdgeMsg, &edgeDetect))
-    {
-      if (edgeDetect)
-      {
-        if(app_reply_msg_send_to_queue(&safetyEdgeMsg, "appStatusTask"))
-        {
-          app_log_debug("appStatusTask -> Safety edge status sent to queue");
-        }
-      }
-    }
-    else
-    {
-      app_log_debug("appStatusTask -> Failed to create safety edge reply message");
-    }
+    // // 2. 压力传感器
+    // memset(&pressureMsg, 0, sizeof(pressureMsg));
+    // if(app_query_pressure_handle(&pressureMsg))
+    // {
+    //   if (app_reply_msg_send_to_queue(&pressureMsg, "appStatusTask"))
+    //   {
+    //     app_log_debug("appStatusTask -> Pressure status sent to queue");
+    //   }
+    // }
+    // else
+    // {
+    //   app_log_debug("appStatusTask -> Failed to create pressure reply message");
+    // }
 
-    // 3. 设备上报状态
-    memset(&deviceStatusMsg, 0, sizeof(deviceStatusMsg));
-    if(app_query_device_status_handle(&deviceStatusMsg))
-    {
-      if (app_reply_msg_send_to_queue(&deviceStatusMsg, "appStatusTask"))
-      {
-        app_log_debug("appStatusTask -> Device status sent to queue");
-      }
-    }
-    else
-    {
-      app_log_debug("appStatusTask -> Failed to create device status reply message");
-    }
+    // // 3. 安全触边  --  事件触发
+    // bool edgeDetect = false;
+    // memset(&safetyEdgeMsg, 0, sizeof(safetyEdgeMsg));
+    // if(app_query_safety_edge_handle(&safetyEdgeMsg, &edgeDetect))
+    // {
+    //   if (edgeDetect)
+    //   {
+    //     if(app_reply_msg_send_to_queue(&safetyEdgeMsg, "appStatusTask"))
+    //     {
+    //       app_log_debug("appStatusTask -> Safety edge status sent to queue");
+    //     }
+    //   }
+    // }
+    // else
+    // {
+    //   app_log_debug("appStatusTask -> Failed to create safety edge reply message");
+    // }
+
+    // // 4. 设备上报状态
+    // memset(&deviceStatusMsg, 0, sizeof(deviceStatusMsg));
+    // if(app_query_device_status_handle(&deviceStatusMsg))
+    // {
+    //   if (app_reply_msg_send_to_queue(&deviceStatusMsg, "appStatusTask"))
+    //   {
+    //     app_log_debug("appStatusTask -> Device status sent to queue");
+    //   }
+    // }
+    // else
+    // {
+    //   app_log_debug("appStatusTask -> Failed to create device status reply message");
+    // }
 
     
-    osDelay(pdMS_TO_TICKS(1000));
+    osDelay(pdMS_TO_TICKS(100));
   }
   /* USER CODE END appStatusTask */
 }
@@ -480,6 +506,16 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
                                &xHigherPriorityTaskWoken);
       portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
+  }
+  else if (huart->Instance == USART1)
+  {
+    if (Size > 0U)
+    {
+      (void)IMU_JY901S_Feed(g_imuRxBuffer, Size);
+    }
+
+    (void)HAL_UARTEx_ReceiveToIdle_DMA(&huart1, g_imuRxBuffer, sizeof(g_imuRxBuffer) - 1U);
+    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   }
 }
 

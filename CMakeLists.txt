@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/motor_crawler_lift.c
     User/motor_ball_head.c
     User/motor_brush.c
+    User/imu_jy901s.c
     User/pressure_sensor.c
     User/safety_edge.c
     User/proximity_switch.c

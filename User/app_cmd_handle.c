@@ -8,6 +8,7 @@
 #include <sys/_intsup.h>
 #include "pressure_sensor.h"
 #include "safety_edge.h"
+#include "imu_jy901s.h"
 
 typedef struct 
 {
@@ -34,9 +35,7 @@ static uint32_t app_msg_id_seq = 0U;
 static app_device_status_t app_device_status;
 
 
-
-
-
+// ============================================== 解析 cmd =================================================================
 
 static bool parse_move_cmd(const app_cmd_msg_t *cmdMsg, char *direction, float *speed)
 {
@@ -198,6 +197,153 @@ error:
     cJSON_Delete(data_json);
     return false;
 }
+
+
+bool create_imu_reply_msg(app_reply_msg_t *imuMsg,
+                          float quat_w, float quat_x, float quat_y, float quat_z,
+                          float angular_velocity_x, float angular_velocity_y, float angular_velocity_z,
+                          float linear_acceleration_x, float linear_acceleration_y, float linear_acceleration_z)
+{
+/*
+{
+  "msg_type_id": 35,
+  "msg_seq": 2004,
+  "msg_type": "report",
+  "msg_name": "imu",
+  "timestamp": 1699000005000,
+  "data": {
+    "data_type": "imu",
+    "quaternion": {
+      "w": 1.0,
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "angular_velocity": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "linear_acceleration": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 9.8
+    },
+  }
+}
+*/
+    cJSON *data_json = NULL;
+    cJSON *quaternion = NULL;
+    cJSON *angular_velocity = NULL;
+    cJSON *linear_acceleration = NULL;
+
+    if (imuMsg == NULL)
+    {
+        return false;
+    }
+
+    memset(imuMsg, 0, sizeof(app_reply_msg_t));
+    imuMsg->msg_type_id = APP_MSG_TYPE_ID_REPORT_IMU;
+    imuMsg->msg_seq = app_msg_id_seq++;
+    (void)snprintf(imuMsg->msg_type, APP_MSG_TYPE_STR_LEN, "%s", "report");
+    (void)snprintf(imuMsg->msg_name, APP_MSG_NAME_STR_LEN, "%s", "imu");
+    imuMsg->timestamp = (uint64_t)HAL_GetTick();
+
+    data_json = cJSON_CreateObject();
+    if (data_json == NULL)
+    {
+        return false;
+    }
+
+    if (!cJSON_AddStringToObject(data_json, "data_type", "imu"))
+    {
+        goto error;
+    }
+
+    quaternion = cJSON_CreateObject();
+    if (quaternion == NULL)
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(quaternion, "w", quat_w))
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(quaternion, "x", quat_x))
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(quaternion, "y", quat_y))
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(quaternion, "z", quat_z))
+    {
+        goto error;
+    }
+    if (!cJSON_AddItemToObject(data_json, "quaternion", quaternion))
+    {
+        goto error;
+    }
+    quaternion = NULL;
+
+    angular_velocity = cJSON_CreateObject();
+    if (angular_velocity == NULL)
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(angular_velocity, "x", angular_velocity_x))
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(angular_velocity, "y", angular_velocity_y))
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(angular_velocity, "z", angular_velocity_z))
+    {
+        goto error;
+    }
+    if (!cJSON_AddItemToObject(data_json, "angular_velocity", angular_velocity))
+    {
+        goto error;
+    }
+    angular_velocity = NULL;
+
+    linear_acceleration = cJSON_CreateObject();
+    if (linear_acceleration == NULL)
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(linear_acceleration, "x", linear_acceleration_x))
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(linear_acceleration, "y", linear_acceleration_y))
+    {
+        goto error;
+    }
+    if (!cJSON_AddNumberToObject(linear_acceleration, "z", linear_acceleration_z))
+    {
+        goto error;
+    }
+    if (!cJSON_AddItemToObject(data_json, "linear_acceleration", linear_acceleration))
+    {
+        goto error;
+    }
+    linear_acceleration = NULL;
+
+    imuMsg->data_json = data_json;
+    return true;
+
+error:
+    cJSON_Delete(quaternion);
+    cJSON_Delete(angular_velocity);
+    cJSON_Delete(linear_acceleration);
+    cJSON_Delete(data_json);
+    return false;
+}
+
 
 bool create_safety_edge_reply_msg(app_reply_msg_t *safetyEdgeMsg, bool detect, char* position, char* level)
 {
@@ -558,6 +704,29 @@ bool app_brush_control_handle(const app_cmd_msg_t *cmdMsg, app_reply_msg_t *repl
 
 
 // ============================================== 主动上报命令 =================================================================
+bool app_query_imu_handle(app_reply_msg_t *imuMsg)
+{
+    const IMU_JY901S_Data *imuData = IMU_JY901S_GetData();
+
+    if ((imuMsg == NULL) || (imuData == NULL))
+    {
+        return false;
+    }
+
+    return create_imu_reply_msg(imuMsg,
+                                imuData->quaternion_w,
+                                imuData->quaternion_x,
+                                imuData->quaternion_y,
+                                imuData->quaternion_z,
+                                imuData->angular_velocity_x,
+                                imuData->angular_velocity_y,
+                                imuData->angular_velocity_z,
+                                imuData->linear_acceleration_x,
+                                imuData->linear_acceleration_y,
+                                imuData->linear_acceleration_z);
+}
+
+
 bool app_query_pressure_handle(app_reply_msg_t *pressureMsg)
 {
     int32_t weight = 0;
