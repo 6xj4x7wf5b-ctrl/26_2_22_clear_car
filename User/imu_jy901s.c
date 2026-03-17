@@ -1,6 +1,7 @@
 #include "imu_jy901s.h"
 
 #include "main.h"
+#include "app_protocol_types.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -129,26 +130,40 @@ static void imu_jy901s_update_data(IMU_JY901S_Data *data, const uint8_t *frame)
 
     switch (frame[1])
     {
-    case IMU_JY901S_FRAME_TYPE_ACCEL:
+    case IMU_JY901S_FRAME_TYPE_ACCEL:   // 加速度
         data->linear_acceleration_x = (((float)raw_x / IMU_JY901S_SCALE_DIVISOR) * IMU_JY901S_ACCEL_RANGE_G) * IMU_JY901S_GRAVITY_MPS2;
         data->linear_acceleration_y = (((float)raw_y / IMU_JY901S_SCALE_DIVISOR) * IMU_JY901S_ACCEL_RANGE_G) * IMU_JY901S_GRAVITY_MPS2;
         data->linear_acceleration_z = (((float)raw_z / IMU_JY901S_SCALE_DIVISOR) * IMU_JY901S_ACCEL_RANGE_G) * IMU_JY901S_GRAVITY_MPS2;
+        app_log_debug("IMU frame 0x51 accel: x=%f y=%f z=%f",
+                      data->linear_acceleration_x,
+                      data->linear_acceleration_y,
+                      data->linear_acceleration_z);
         break;
 
-    case IMU_JY901S_FRAME_TYPE_GYRO:
+    case IMU_JY901S_FRAME_TYPE_GYRO:    // 角速度
         data->angular_velocity_x = (((float)raw_x / IMU_JY901S_SCALE_DIVISOR) * IMU_JY901S_GYRO_RANGE_DPS) * IMU_JY901S_DEG_TO_RAD;
         data->angular_velocity_y = (((float)raw_y / IMU_JY901S_SCALE_DIVISOR) * IMU_JY901S_GYRO_RANGE_DPS) * IMU_JY901S_DEG_TO_RAD;
         data->angular_velocity_z = (((float)raw_z / IMU_JY901S_SCALE_DIVISOR) * IMU_JY901S_GYRO_RANGE_DPS) * IMU_JY901S_DEG_TO_RAD;
+        app_log_debug("IMU frame 0x52 gyro: x=%f y=%f z=%f",
+                      data->angular_velocity_x,
+                      data->angular_velocity_y,
+                      data->angular_velocity_z);
         break;
 
-    case IMU_JY901S_FRAME_TYPE_QUATERNION:
+    case IMU_JY901S_FRAME_TYPE_QUATERNION:      // 四元数
         data->quaternion_w = (float)raw_x / IMU_JY901S_SCALE_DIVISOR;
         data->quaternion_x = (float)raw_y / IMU_JY901S_SCALE_DIVISOR;
         data->quaternion_y = (float)raw_z / IMU_JY901S_SCALE_DIVISOR;
         data->quaternion_z = (float)raw_t / IMU_JY901S_SCALE_DIVISOR;
+        app_log_debug("IMU frame 0x59 quat: w=%f x=%f y=%f z=%f",
+                      data->quaternion_w,
+                      data->quaternion_x,
+                      data->quaternion_y,
+                      data->quaternion_z);
         break;
 
     default:
+        app_log_debug("IMU frame unsupported: type=0x%02X", frame[1]);
         return;
     }
 
@@ -203,6 +218,7 @@ uint16_t IMU_JY901S_Process(void)
 
         if (!imu_jy901s_checksum_ok(s_imu_context.frame_buffer))
         {
+            app_log_debug("IMU checksum error: type=0x%02X", s_imu_context.frame_buffer[1]);
             imu_jy901s_parser_resync(&s_imu_context);
             continue;
         }
