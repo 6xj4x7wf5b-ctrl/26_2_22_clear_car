@@ -49,8 +49,8 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-extern DMA_HandleTypeDef hdma_usart1_rx;
 extern DMA_HandleTypeDef hdma_usart3_rx;
+extern DMA_HandleTypeDef hdma_uart4_rx;
 
 /* USER CODE END PTD */
 
@@ -421,8 +421,8 @@ void appStatusTask(void *argument)
   IMU_JY901S_Init();
 
 
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, g_imuRxBuffer, sizeof(g_imuRxBuffer) - 1U);
-  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);  // 禁止半传输中断，避免干扰IDLE中断处理
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart4, g_imuRxBuffer, sizeof(g_imuRxBuffer) - 1U);
+  __HAL_DMA_DISABLE_IT(&hdma_uart4_rx, DMA_IT_HT);  // 禁止半传输中断，避免干扰IDLE中断处理
   /* Infinite loop */
   for(;;)
   {
@@ -535,15 +535,15 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
       portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
   }
-  else if (huart->Instance == USART1)
+  else if (huart->Instance == UART4)
   {
     if (Size > 0U)
     {
       (void)IMU_JY901S_Feed(g_imuRxBuffer, Size);
     }
 
-    (void)HAL_UARTEx_ReceiveToIdle_DMA(&huart1, g_imuRxBuffer, sizeof(g_imuRxBuffer) - 1U);
-    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+    (void)HAL_UARTEx_ReceiveToIdle_DMA(&huart4, g_imuRxBuffer, sizeof(g_imuRxBuffer) - 1U);
+    __HAL_DMA_DISABLE_IT(&hdma_uart4_rx, DMA_IT_HT);
   }
 }
 
